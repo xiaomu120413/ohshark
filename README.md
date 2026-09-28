@@ -47,11 +47,12 @@ thirty/                                ← 工作区根 = 本仓库
   qtbase-dev/src/plugins/platforms/ohos/`
 
 工作区内**不入库**的大目录：`qtbase-oh2`（Qt 构建树）、`qtbase-host`
-（主机工具链）、`mingw`、`pc2b-ohos-thirdparty`（第三方依赖移植项目，
-独立仓库）、`ohshark-qt-hap/entry/libs`（部署的 .so）、`local-sign/`
-（签名材料）、`HarmonyMarkdownWorkbench`（独立嵌套仓库）。
-构建产物（`entry/build`、签名 HAP、验证截图、调试日志）已清理，
-均可由流水线重新生成。
+（主机工具链）、`mingw`、`ohshark-qt-hap/entry/libs`（部署的 .so）、
+`local-sign/`（签名材料）、`HarmonyMarkdownWorkbench`（独立嵌套仓库）。
+构建产物（`entry/build`、签名 HAP、验证截图、调试日志）与整个
+`pc2b-ohos-thirdparty` 依赖移植工作区均已清理；Wireshark 依赖前缀
+（glib/pcap/zlib/gcrypt/gpgerr/cares/speexdsp/qt5compat 等）已就位于
+`ws-win/` 下，上游原始参考在 `reference/`。
 
 ## 构建 → 部署 → 验证 流水线
 
