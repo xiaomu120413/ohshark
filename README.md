@@ -40,10 +40,18 @@ thirty/                                ← 工作区根 = 本仓库
 └── README.md
 ```
 
+- `reference/`：上游原始代码参考（来自 qt-harmonyos-src-5.12.12 快照）——
+  `pristine-qtbase-ohos-plugin/` 是未修改的 OHOS 平台插件，
+  `pristine-qtbase-modified-files/` 是本仓库修改过的 6 个 Qt 文件的原始版。
+  想看移植改动：`git diff --no-index reference/pristine-qtbase-ohos-plugin/ohos
+  qtbase-dev/src/plugins/platforms/ohos/`
+
 工作区内**不入库**的大目录：`qtbase-oh2`（Qt 构建树）、`qtbase-host`
-（主机工具链）、`mingw`、`pc2b-ohos-thirdparty`（第三方依赖）、`shots/`
-（验证截图）、`ohshark-qt-hap/entry/libs`（部署的 .so）、`*.hap`、
-`local-sign/`（签名材料）、`HarmonyMarkdownWorkbench`（独立嵌套仓库）。
+（主机工具链）、`mingw`、`pc2b-ohos-thirdparty`（第三方依赖移植项目，
+独立仓库）、`ohshark-qt-hap/entry/libs`（部署的 .so）、`local-sign/`
+（签名材料）、`HarmonyMarkdownWorkbench`（独立嵌套仓库）。
+构建产物（`entry/build`、签名 HAP、验证截图、调试日志）已清理，
+均可由流水线重新生成。
 
 ## 构建 → 部署 → 验证 流水线
 

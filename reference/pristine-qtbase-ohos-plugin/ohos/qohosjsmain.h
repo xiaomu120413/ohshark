@@ -1,0 +1,39 @@
+// Copyright (C) 2025 The Qt Company Ltd.
+// SPDX-License-Identifier: LicenseRef-Qt-Commercial OR LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
+
+#ifndef QOHOSJSMAIN_H
+#define QOHOSJSMAIN_H
+
+#include <QtCore/qloggingcategory.h>
+
+QT_BEGIN_NAMESPACE
+
+Q_DECLARE_LOGGING_CATEGORY(QtForOhos)
+
+namespace QtOhos {
+
+bool isA11ySupportEnabled();
+bool isSupportContextMenuEventOnLongPressEnabled();
+bool isOhosNoUiChildMode();
+bool isGlBackingStoreDefaultEnabled();
+bool isDebugDrawQtRasterBackingStoreFlushedRegionEnabled();
+bool isDebugUseBasicStyleAndThemeEnabled();
+bool isNativeNodeApiKeyEventsEnabled();
+bool isNativeNodeApiMouseEventsEnabled();
+bool isOhosUiExtensionMode();
+bool isVsyncOnSoftwareBackingStoreEnabled();
+bool isOhosBundledUiExtensionMode();
+
+bool acquireAndCleanPendingAutoStartedInstanceWindowFlag();
+
+void quitApplicationFromJsThread();
+
+void updateApplicationState(int state);
+
+bool blockEventLoopsWhenSuspended();
+
+}
+
+QT_END_NAMESPACE
+
+#endif // QOHOSJSMAIN_H

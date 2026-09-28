@@ -12,6 +12,7 @@
 !/.gitattributes
 !/README.md
 !/PORTING-FIXES.md
+!/reference/
 
 # ---- 根目录：构建/部署/调试脚本与工具链配置 ----
 !/*.sh
