@@ -17,8 +17,12 @@
 # ---- 根目录：构建/部署/调试脚本与工具链配置 ----
 !/*.sh
 !/*.ps1
+!/*.cmake
 !/ohos-cross.txt
 !/ohos-native.txt
+!/cmake-modules/
+!/ws-ohos-core/
+!/device-trusted-ca-new.json
 
 # ---- 调试日志与截图不入库 ----
 /ohshark-logs*.txt
