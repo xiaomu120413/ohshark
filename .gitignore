@@ -1,0 +1,120 @@
+# ============================================================
+# 白名单式 .gitignore：默认忽略一切，只放行移植工作相关的源码、
+# 脚本与文档。大目录（Qt 构建树、Wireshark 全量源码、工具链、
+# 产物、签名材料）一律不入库。
+# ============================================================
+
+# ---- 默认忽略根目录下所有条目 ----
+/*
+
+# ---- 根目录：文档、仓库元文件 ----
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/PORTING-FIXES.md
+
+# ---- 根目录：构建/部署/调试脚本与工具链配置 ----
+!/*.sh
+!/*.ps1
+!/ohos-cross.txt
+!/ohos-native.txt
+
+# ---- 调试日志与截图不入库 ----
+/ohshark-logs*.txt
+/ohshark-realtime*.txt
+/shots/
+
+# ============================================================
+# qtbase-dev：Qt 源码树（只跟踪修改过的部分，其余是上游原样）
+# ============================================================
+!/qtbase-dev/
+/qtbase-dev/*
+
+# OHOS 交叉编译 mkspec（自建）
+!/qtbase-dev/mkspecs/
+/qtbase-dev/mkspecs/*
+!/qtbase-dev/mkspecs/ohos-clang/
+
+# OHOS 平台插件（移植核心，整体跟踪）
+!/qtbase-dev/src/
+/qtbase-dev/src/*
+!/qtbase-dev/src/plugins/
+/qtbase-dev/src/plugins/*
+!/qtbase-dev/src/plugins/platforms/
+/qtbase-dev/src/plugins/platforms/*
+!/qtbase-dev/src/plugins/platforms/ohos/
+
+# HAP 工程的 ArkTS 页面模板（上游模板 + 本仓库的修改）
+!/qtbase-dev/src/harmonyos/
+
+# 上游之外修改过的 Qt 模块文件
+!/qtbase-dev/src/gui/
+/qtbase-dev/src/gui/*
+!/qtbase-dev/src/gui/kernel/
+/qtbase-dev/src/gui/kernel/*
+!/qtbase-dev/src/gui/kernel/qguiapplication.cpp
+!/qtbase-dev/src/gui/kernel/qwindow.cpp
+!/qtbase-dev/src/widgets/
+/qtbase-dev/src/widgets/*
+!/qtbase-dev/src/widgets/kernel/
+/qtbase-dev/src/widgets/kernel/*
+!/qtbase-dev/src/widgets/kernel/qwidget.cpp
+!/qtbase-dev/src/widgets/kernel/qwidgetwindow.cpp
+!/qtbase-dev/src/widgets/widgets/
+/qtbase-dev/src/widgets/widgets/*
+!/qtbase-dev/src/widgets/widgets/qmenu.cpp
+!/qtbase-dev/src/widgets/widgets/qmenubar.cpp
+
+# ============================================================
+# qtbase-ohos：上游 Qt 安装前缀（原样参考）——只保留原始 ets 模板
+# ============================================================
+!/qtbase-ohos/
+/qtbase-ohos/*
+!/qtbase-ohos/src/
+/qtbase-ohos/src/*
+!/qtbase-ohos/src/harmonyos/
+
+# ============================================================
+# ohshark-qt-hap：鸿蒙 HAP 工程（不含构建产物与 so 库）
+# ============================================================
+!/ohshark-qt-hap/
+/ohshark-qt-hap/*
+!/ohshark-qt-hap/AppScope/
+!/ohshark-qt-hap/CMakeLists.txt
+!/ohshark-qt-hap/README.md
+!/ohshark-qt-hap/build-profile.json5
+!/ohshark-qt-hap/hvigorfile.ts
+!/ohshark-qt-hap/oh-package.json5
+!/ohshark-qt-hap/oh-package-lock.json5
+!/ohshark-qt-hap/entry/
+/ohshark-qt-hap/entry/*
+!/ohshark-qt-hap/entry/build-profile.json5
+!/ohshark-qt-hap/entry/hvigorfile.ts
+!/ohshark-qt-hap/entry/oh-package.json5
+!/ohshark-qt-hap/entry/oh-package-lock.json5
+!/ohshark-qt-hap/entry/obfuscation-rules.txt
+!/ohshark-qt-hap/entry/src/
+
+# ============================================================
+# ws-win：Wireshark 源码与构建脚本（源码只跟踪修改过的文件）
+# ============================================================
+!/ws-win/
+/ws-win/*
+!/ws-win/*.sh
+!/ws-win/wireshark-4.2.5/
+/ws-win/wireshark-4.2.5/*
+!/ws-win/wireshark-4.2.5/ui/
+/ws-win/wireshark-4.2.5/ui/*
+!/ws-win/wireshark-4.2.5/ui/qt/
+/ws-win/wireshark-4.2.5/ui/qt/*
+!/ws-win/wireshark-4.2.5/ui/qt/main.cpp
+!/ws-win/wireshark-4.2.5/capture/
+/ws-win/wireshark-4.2.5/capture/*
+!/ws-win/wireshark-4.2.5/capture/capture_ifinfo.c
+
+# ============================================================
+# tools/：本仓库自带的构建辅助工具（含签名脚本副本，
+# 材料在 local-sign/，永不入库；HarmonyMarkdownWorkbench 是独立
+# 的嵌套 git 仓库，整体排除）
+# ============================================================
+!/tools/

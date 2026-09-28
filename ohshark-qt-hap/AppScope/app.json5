@@ -1,0 +1,16 @@
+{
+  "app": {
+    "bundleName": "com.ohshark.qt",
+    "configuration": "$profile:configuration",
+    "vendor": "OhShark",
+    "versionCode": 1000000,
+    "versionName": "1.0.0",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name",
+    "appEnvironments": [
+      {"name":"QT_LOGGING_RULES","value":"qt.ohos.debug=true;qt.gui.debug=true;*.debug=true"},
+      {"name":"QT_DEBUG_PLUGINS","value":"1"},
+      {"name":"QT_LOGGING","value":"1"}
+    ]
+  }
+}

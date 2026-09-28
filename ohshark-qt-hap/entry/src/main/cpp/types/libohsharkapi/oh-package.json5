@@ -1,0 +1,6 @@
+{
+  "name": "libohsharkapi.so",
+  "types": "./index.d.ts",
+  "version": "",
+  "description": "OhShark engine bridge: runTshark/interfaces/version/writeSample"
+}

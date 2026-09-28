@@ -1,0 +1,131 @@
+# OhShark — Wireshark 4.2.5 × HarmonyOS (arm64) 移植
+
+把真正的上游 Wireshark 4.2.5（原版 Qt Widgets GUI，非自绘界面）移植到
+HarmonyOS NEXT arm64 真机（HUAWEI MateBook Pro，设备 ID `3QC0124C11000711`）
+并做到完全可用。本仓库是整个移植工作区的**白名单式 git 仓库**：只跟踪
+修改过的源码、脚本与文档；上游全量源码树、构建产物、工具链一律不入库
+（详见 `.gitignore`）。
+
+**完整修复历史与深层根因分析见 [PORTING-FIXES.md](PORTING-FIXES.md)。**
+
+## 当前状态（2026-09-28）
+
+| 功能 | 状态 |
+|---|---|
+| 主窗口渲染（装饰窗口+标题栏+三键） | ✅ 可用（系统标题栏，showMaximized） |
+| 字体（262 系统字体，无豆腐块） | ✅ |
+| 主界面 1× 正确比例（DPR 双重计数已修） | ✅ |
+| 菜单/对话框=独立系统子窗口（1× 渲染，全部条目+快捷键列） | ✅ 渲染通过 |
+| 菜单条目点击 | 🔧 坐标偏移修复中（菜单 QWindow 几何被同步成主窗口全屏值，触摸归一化位置偏移） |
+| 触控板/鼠标 | 🔧 XComponent DispatchMouseEvent 路径已打通，待真机实测 |
+| 抓包（dumpcap） | ⚠️ 真机无 root 受限，回退 pcap_findalldevs，主要用 sample.pcap 回放 |
+
+## 仓库结构与工作区
+
+```
+thirty/                                ← 工作区根 = 本仓库
+├── qtbase-dev/                        ← Qt 源码树（跟踪修改部分）
+│   ├── src/plugins/platforms/ohos/    ← ★ 移植核心：OHOS 平台插件（整体跟踪）
+│   ├── src/harmonyos/templates/       ← HAP 工程 ArkTS 模板（含修改）
+│   ├── mkspecs/ohos-clang/            ← 自建 OHOS 交叉编译 mkspec
+│   └── src/{gui,widgets}/…            ← 修改过的 6 个 Qt 模块文件
+├── qtbase-ohos/                       ← 上游 Qt 安装前缀（仅原始 ets 模板作参考）
+├── ohshark-qt-hap/                    ← 鸿蒙 HAP 工程（ets 页面 + cpp + 资源；
+│                                         libs/ 与 build/ 不入库）
+├── ws-win/                            ← Wireshark 源码（仅跟踪 main.cpp、
+│                                         capture_ifinfo.c 与构建脚本）
+├── tools/sign-local.sh                ← HAP 本地签名脚本（材料在 local-sign/，不入库）
+├── *.sh / *.ps1                       ← 构建、部署、验证（OCR/像素探针）脚本
+├── PORTING-FIXES.md                   ← 分节修复记录（根因分析）
+└── README.md
+```
+
+工作区内**不入库**的大目录：`qtbase-oh2`（Qt 构建树）、`qtbase-host`
+（主机工具链）、`mingw`、`pc2b-ohos-thirdparty`（第三方依赖）、`shots/`
+（验证截图）、`ohshark-qt-hap/entry/libs`（部署的 .so）、`*.hap`、
+`local-sign/`（签名材料）、`HarmonyMarkdownWorkbench`（独立嵌套仓库）。
+
+## 构建 → 部署 → 验证 流水线
+
+### 1. 编译 Qt OHOS 平台插件（及改过的 Qt 模块）
+
+```bash
+cd qtbase-oh2
+export PATH="/c/Users/mu/Desktop/code/thirty/qtbase-host/bin:$PATH"
+/c/Users/mu/Desktop/code/thirty/mingw/mingw64/bin/cmake.exe --build . --target qohos     # 平台插件
+/c/Users/mu/Desktop/code/thirty/mingw/mingw64/bin/cmake.exe --build . --target Widgets  # 改过 Widgets 时
+"/c/Program Files/Huawei/DevEco Studio/sdk/default/openharmony/native/llvm/bin/llvm-strip.exe" \
+    -s plugins/platforms/libqohos.so lib/libQt6Widgets.so
+cp plugins/platforms/libqohos.so ../ohshark-qt-hap/entry/libs/arm64-v8a/
+cp lib/libQt6Widgets.so       ../ohshark-qt-hap/entry/libs/arm64-v8a/   # 按需
+```
+
+### 2. 编译 Wireshark GUI（改过 ws-win 源码时）
+
+```bash
+bash ws-win/ws-gui-build.sh
+```
+
+### 3. 打包 HAP
+
+```bash
+cd ohshark-qt-hap && ./hvigorw assembleHap --mode module -p product=default debuggable
+```
+
+### 4. 签名 + 安装 + 启动
+
+```bash
+cd ..
+bash tools/sign-local.sh \
+    ohshark-qt-hap/entry/build/default/outputs/default/entry-default-unsigned.hap \
+    ohshark-qt-hap/entry-default-signed.hap 3QC0124C11000711 com.ohshark.qt
+MSYS_NO_PATHCONV=1 hdc install -r ohshark-qt-hap/entry-default-signed.hap
+MSYS_NO_PATHCONV=1 hdc shell "aa start -a QAbility -b com.ohshark.qt -m entry"
+```
+
+### 5. 真机验证（MCP 截图 + OCR + 触摸注入）
+
+```bash
+MSYS_NO_PATHCONV=1 hdc shell "snapshot_display -f /data/local/tmp/s.jpeg"
+MSYS_NO_PATHCONV=1 hdc file recv /data/local/tmp/s.jpeg <本地路径>
+powershell -ExecutionPolicy Bypass -File ocr-shot.ps1 <截图绝对路径>   # OCR
+MSYS_NO_PATHCONV=1 hdc shell "uinput -T -m X Y X Y 300"              # 注入点击
+MSYS_NO_PATHCONV=1 hdc shell "hilog -x" | grep OhShark               # 日志
+```
+
+> 验证纪律：**任何渲染/输入结论必须以截图 OCR + 像素探针 + 真实注入点击
+> 为准**，不能只看日志。日志工具悬浮窗（com.huawei.log_tool）会盖在应用
+> 上拦截触摸，测试前用 `aa start` 把应用提回前台。
+
+## 关键架构决策（摘要）
+
+1. **Qt High-DPI 单位契约**：`QOhosPlatformScreen::logicalDpi()/logicalBaseDpi()`
+   比率（=系统 densityPixels=2）激活 QHighDpiScaling，因子 2 独自承担
+   QWindow 逻辑坐标 ↔ 原生（物理）像素的换算；**平台窗口
+   `devicePixelRatio()` 必须返回 1.0**。插件内任何额外 ×DPR/÷DPR 都会造成
+   双重换算（曾导致主窗口长期 2× 缩放 + 下半屏截断、菜单 2× 放大裁剪）。
+2. **平台插件全程使用原生像素**：`QPlatformWindow::setGeometry/geometry()`
+   传/收原生矩形，Qt 在 QWindow 边界自动换算。触摸点也是物理像素，
+   与 `geometry()` 直接相减。
+3. **子窗口（菜单/对话框）独立渲染**：ets 页面放双 XComponent——
+   NODE 型做挂载锚点+输入+onAppear（SURFACE 型在隐藏子窗口中永不触发
+   onAppear，会死锁创建链）；SURFACE 型（id 后缀 `_surf`）做渲染目标，
+   由 `QXComponentRegistry` 捕获其 OHNativeWindow，视图侧轮询采纳为
+   自有表面后直接 flush。节点树**不** attach 到子窗口的 NODE XComponent
+   （attach 会让节点树成为命中测试目标，XComponent 收不到任何输入）。
+4. **输入路径**：主窗口走 ets XComponent `DispatchTouchEvent`；子窗口走
+   ArkTS 窗口级事件过滤（`onTouchEventFromArkUi` 转发）。子窗口在
+   loadContent 后必须 `setWindowFocusable(true)`（非 focusable 的子窗口
+   输入直接穿透）。鼠标统一走 XComponent `DispatchMouseEvent`
+   （node-API 鼠标路径因节点树 HIT_TEST NONE 永不触发，开关已置 false）。
+5. **backing store**：软件渲染直写各窗口自有表面；主窗口表面 = ets
+   SURFACE XComponent 的 surface（registry 全局捕获）；图像尺寸 =
+   请求尺寸（原生）× 平台窗口 dpr(1.0) = 1:1。
+
+## 已知未决问题
+
+- 菜单 QWindow 的平台几何在显示后被同步成主窗口全屏值
+  （`pgeom=[0,70 3120x1885]` 而非创建时的 `[322,116 472x324]`），
+  触摸重定向后的归一化坐标随之偏移 → 菜单条目点击落点不对。
+  排查方向：`handleNodeResizeEvent`/`viewGeometry()` 对 SubWindow 的
+  `drawableRect` 处理。

@@ -1,0 +1,9 @@
+[binaries]
+ninja = 'C:/Users/mu/Desktop/code/thirty/ninja.exe'
+gperf = 'C:/Users/mu/Desktop/code/thirty/gperf/bin/gperf.exe'
+
+[build_machine]
+system = 'windows'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'
