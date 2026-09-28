@@ -338,3 +338,44 @@ requested 尺寸也已是原生全尺寸；我在 QOhosPlatformWindow::devicePix
   怀疑 `handleNodeResizeEvent`/`viewGeometry()` 对 SubWindow 的
   drawableRect 语义（子窗口无装饰时 drawableRect 可能为空/误用主窗口值）。
   这是菜单条目点击的最后一步。
+
+## 十八、2026-09-28：触摸反向劫持修复——菜单/对话框全链路打通（终）
+
+上一节未决问题的真相：菜单 QWindow 几何其实**从未**被改成全屏——那是因为
+DPR 修复后几何本来就正确了。真正的最后一环是 `onTouchEventFromXComponent`
+里的"嵌入式弹窗触摸重定向"**反向劫持**：触摸经子窗口 ArkTS 事件过滤已正确
+送达菜单 QWindow，重定向却把它改回主窗口（旧架构兼容逻辑，检查
+`candidate->geometry() × QWindow::devicePixelRatio()`，DPR=4 时代矩形全错）。
+
+修复：`targetWindow->type() & (Qt::Popup | Qt::Dialog)` 时跳过重定向——
+触摸已正确寻址，只有从主窗口 XComponent 进来的触摸才需要重定向。
+
+诊断手段升级（全部从文件日志转 hilog）：`[fw.setGeometry]`、`[geo.fromOhos]`、
+`[xcomp.touch]`、`[touch.redirect]`、`[touch.map]`（含 pgeom/margins/qgeom）、
+`[ww.touch]`、`[ww.mouse]`、`[menu.press]`、`[menu.release]`——逐层定位：
+触摸过滤 ✓ → 归一化坐标 ✓（normal=0.212,0.398）→ QWSI ✓ → QWidgetWindow
+✓ → 合成鼠标 press/release ✓ → QMenu::mousePress/ReleaseEvent ✓
+→ actionAt==currentAction ✓ → **action 触发**。
+
+### 全链路实测结果（截图 OCR + uinput 注入）
+
+1. 菜单条点击 → Capture 菜单独立子窗口（1× 全条目：Options…Ctrl+K、
+   Capture Filters…、Refresh Interfaces F5）。
+2. "Options…" 点击 → action 触发、菜单关闭 → **Capture Options 对话框**
+   以独立装饰子窗口弹出（系统标题栏 "Wireshark · Capture Options"，
+   OCR 全读：Interface/Traffic/Link-layer Header/Promiscuous/Snaplen 列、
+   Enable promiscuous mode…、Manage Interfaces…、Compile BPFs、
+   Start/Close/Help）。
+3. 对话框 Close 按钮点击 → 对话框关闭、主界面恢复交互。
+4. 主窗口三键实测：还原（1560x943→1560x980 状态切换）、
+   最小化（窗口收起、桌面露出、aa start 可恢复）、关闭（同机制）。
+5. 鼠标事件链路：`uinput -M` 注入 move → `[ww.mouse] type=5` 到达
+   主窗口 hit=QWidget，坐标换算正确——触控板（同 DispatchMouseEvent
+   路径）事件管线打通，待物理触控板手感实测。
+
+### 残留小项（不阻塞可用性）
+
+- 触摸事件多路径重复投递（窗口过滤 + XComponent 各一份，46+46）——
+  Qt 状态机自行收敛，无可见副作用；后续可在 filterEvent 返回 true 消费掉。
+- 弹簧刀式 46 个重复 TouchBegin——同上。
+- 触控板物理手感需人工实测。

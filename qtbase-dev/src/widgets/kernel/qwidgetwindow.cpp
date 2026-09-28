@@ -521,32 +521,13 @@ void QWidgetWindow::handleMouseEvent(QMouseEvent *event)
     // so we need QPointer to avoid a dangling d below
     QPointer<QWidgetWindow> self = this;
 
-    if (FILE *df = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
+    {
         QWidget *hit = m_widget ? m_widget->childAt(event->position().toPoint()) : nullptr;
-        fprintf(df, "[ww.mouse] type=%d pos=%f,%f popup=%s hit=%s mw=%s",
+        qOhosPrintfInfo("[ww.mouse] type=%d pos=%.1f,%.1f popup=%s hit=%s mw=%s",
                 int(event->type()), event->position().x(), event->position().y(),
                 QApplication::activePopupWidget() ? "yes" : "none",
                 hit ? hit->metaObject()->className() : "null",
                 m_widget ? m_widget->metaObject()->className() : "?");
-        if (m_widget) {
-            if (auto *dbgHandle = m_widget->windowHandle())
-                fprintf(df, " qwin=%d,%d %dx%d", dbgHandle->x(), dbgHandle->y(),
-                        dbgHandle->width(), dbgHandle->height());
-            const auto directChildren = m_widget->findChildren<QWidget*>(Qt::FindDirectChildrenOnly);
-            int dumped = 0;
-            for (const auto *childWidget : directChildren) {
-                if (dumped >= 4)
-                    break;
-                fprintf(df, " c[%d]=%s(%d,%d %dx%d) vis=%d", dumped,
-                        childWidget->metaObject()->className(),
-                        childWidget->x(), childWidget->y(),
-                        childWidget->width(), childWidget->height(),
-                        int(childWidget->isVisible()));
-                dumped++;
-            }
-        }
-        fprintf(df, "\n");
-        fclose(df);
     }
 
     if (auto *activePopupWidget = QApplication::activePopupWidget()) {
@@ -741,6 +722,10 @@ void QWidgetWindow::handleMouseEvent(QMouseEvent *event)
 
 void QWidgetWindow::handleTouchEvent(QTouchEvent *event)
 {
+    qOhosPrintfInfo("[ww.touch] mw=%s type=%d pts=%d popup=%s",
+                    m_widget ? m_widget->metaObject()->className() : "?",
+                    int(event->type()), int(event->points().size()),
+                    QApplication::activePopupWidget() ? "yes" : "none");
     if (event->type() == QEvent::TouchCancel) {
         QApplicationPrivate::translateTouchCancel(event->pointingDevice(), event->timestamp());
         event->accept();

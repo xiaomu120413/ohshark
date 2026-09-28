@@ -15,9 +15,9 @@ HarmonyOS NEXT arm64 真机（HUAWEI MateBook Pro，设备 ID `3QC0124C11000711`
 | 主窗口渲染（装饰窗口+标题栏+三键） | ✅ 可用（系统标题栏，showMaximized） |
 | 字体（262 系统字体，无豆腐块） | ✅ |
 | 主界面 1× 正确比例（DPR 双重计数已修） | ✅ |
-| 菜单/对话框=独立系统子窗口（1× 渲染，全部条目+快捷键列） | ✅ 渲染通过 |
-| 菜单条目点击 | 🔧 坐标偏移修复中（菜单 QWindow 几何被同步成主窗口全屏值，触摸归一化位置偏移） |
-| 触控板/鼠标 | 🔧 XComponent DispatchMouseEvent 路径已打通，待真机实测 |
+| 菜单/对话框=独立系统子窗口（1× 渲染，全部条目+快捷键列） | ✅ 实测通过 |
+| 菜单条目点击 → 触发动作 → 弹出对话框 → 对话框按钮交互 | ✅ 全链路实测通过 |
+| 触控板/鼠标 | ✅ 事件管线实测（DispatchMouseEvent）；物理手感待人工确认 |
 | 抓包（dumpcap） | ⚠️ 真机无 root 受限，回退 pcap_findalldevs，主要用 sample.pcap 回放 |
 
 ## 仓库结构与工作区
@@ -133,8 +133,6 @@ MSYS_NO_PATHCONV=1 hdc shell "hilog -x" | grep OhShark               # 日志
 
 ## 已知未决问题
 
-- 菜单 QWindow 的平台几何在显示后被同步成主窗口全屏值
-  （`pgeom=[0,70 3120x1885]` 而非创建时的 `[322,116 472x324]`），
-  触摸重定向后的归一化坐标随之偏移 → 菜单条目点击落点不对。
-  排查方向：`handleNodeResizeEvent`/`viewGeometry()` 对 SubWindow 的
-  `drawableRect` 处理。
+- 触摸事件多路径重复投递（窗口过滤 + XComponent 各一份）——Qt 状态机
+  自行收敛，无可见副作用；可在 `filterEvent` 返回 true 消费掉以优化。
+- 触控板物理手感需人工实测（事件管线已验证）。

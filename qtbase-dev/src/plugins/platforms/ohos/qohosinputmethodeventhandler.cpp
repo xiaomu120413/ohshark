@@ -267,7 +267,13 @@ void QOhosInputMethodEventHandler::onTouchEventFromXComponent(
     // so their touches arrive here addressed to the main window. Re-target
     // the event to the embedded window under the touch point (smallest
     // containing window wins — menus are smaller than dialogs).
-    if (targetWindow != nullptr && targetWindow->parent() == nullptr
+    // NOTE: only re-target touches addressed to the MAIN window — a touch
+    // already addressed to a Popup/Dialog window was forwarded by that
+    // window's own ArkTS event filter and is correctly targeted; hijacking
+    // it back to the main window would break subwindow input entirely.
+    if (targetWindow != nullptr
+        && targetWindow->parent() == nullptr
+        && !(targetWindow->type() & (Qt::Popup | Qt::Dialog))
         && !touchPoints.empty()) {
         const QPointF touchPos = touchPoints.front().displayPosition;
         QWindow *bestWindow = nullptr;

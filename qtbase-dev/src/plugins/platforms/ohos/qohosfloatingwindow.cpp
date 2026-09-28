@@ -61,14 +61,11 @@ void QOhosFloatingWindow::setGeometry(const QRect &rect)
     // QWindow boundary. Store every incoming rect raw.
     const QRect &adjustedRect = rect;
     // ohshark diag
-    if (FILE *df = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
-        fprintf(df, "[fw.setGeometry] win=%p '%s' rect=%d,%d %dx%d type=%d\n",
-                (void *)window(),
-                window() ? window()->metaObject()->className() : "?",
-                adjustedRect.x(), adjustedRect.y(), adjustedRect.width(), adjustedRect.height(),
-                int(window()->type()));
-        fclose(df);
-    }
+    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
+        "[fw.setGeometry] win=%{public}p rect=%{public}d,%{public}d %{public}dx%{public}d type=%{public}d",
+        (void *)window(),
+        adjustedRect.x(), adjustedRect.y(), adjustedRect.width(), adjustedRect.height(),
+        int(window()->type()));
     auto *view = ownedViewOrNull();
     bool geometryControlledBySystem =
         !QOhosSettings::instance().isWindowPcModeEnabled()

@@ -4,6 +4,7 @@
 
 #include "qmenu.h"
 
+#include <QtCore/private/qohoslogger_p.h>
 #include <QtWidgets/private/qtwidgetsglobal_p.h>
 #include <QtWidgets/private/qwidgetwindow_p.h>
 
@@ -2929,15 +2930,14 @@ void QMenu::wheelEvent(QWheelEvent *e)
 void QMenu::mousePressEvent(QMouseEvent *e)
 {
     Q_D(QMenu);
-    if (FILE *df = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
+    {
         QAction *dbgAction = d->actionAt(e->position().toPoint());
-        fprintf(df, "[menu.press] pos=%f,%f global=%f,%f rect=%dx%d contains=%d action=%s\n",
+        qOhosPrintfInfo("[menu.press] pos=%.1f,%.1f rect=%dx%d contains=%d action=%s cur=%s",
                 e->position().x(), e->position().y(),
-                e->globalPosition().x(), e->globalPosition().y(),
                 rect().width(), rect().height(),
                 int(rect().contains(e->position().toPoint())),
-                dbgAction ? dbgAction->text().toUtf8().constData() : "null");
-        fclose(df);
+                dbgAction ? dbgAction->text().toUtf8().constData() : "null",
+                d->currentAction ? d->currentAction->text().toUtf8().constData() : "null");
     }
     if (d->aboutToHide || d->mouseEventTaken(e))
         return;
@@ -2969,14 +2969,13 @@ void QMenu::mousePressEvent(QMouseEvent *e)
 void QMenu::mouseReleaseEvent(QMouseEvent *e)
 {
     Q_D(QMenu);
-    if (FILE *df = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
+    {
         QAction *dbgAction = d->actionAt(e->position().toPoint());
-        fprintf(df, "[menu.release] pos=%f,%f global=%f,%f action=%s cur=%s\n",
+        qOhosPrintfInfo("[menu.release] pos=%.1f,%.1f action=%s cur=%s mouseDown=%s",
                 e->position().x(), e->position().y(),
-                e->globalPosition().x(), e->globalPosition().y(),
                 dbgAction ? dbgAction->text().toUtf8().constData() : "null",
-                d->currentAction ? d->currentAction->text().toUtf8().constData() : "null");
-        fclose(df);
+                d->currentAction ? d->currentAction->text().toUtf8().constData() : "null",
+                QMenuPrivate::mouseDown ? "yes" : "null");
     }
     if (d->aboutToHide || d->mouseEventTaken(e))
         return;

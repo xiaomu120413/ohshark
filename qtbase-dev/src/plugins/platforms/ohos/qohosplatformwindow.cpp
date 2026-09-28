@@ -652,14 +652,11 @@ void QOhosPlatformWindow::setWindowGeometryFromOhos(const QRect &nativeWindowDra
     // Qt's high-DPI layer converts native<->logical itself; the platform
     // reports native pixels raw.
     const QRect &logicalGeometry = nativeWindowDrawGeometry;
-    if (FILE *gw = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
-        fprintf(gw, "[geo.fromOhos] in=%d,%d %dx%d out=%d,%d %dx%d\n",
-                nativeWindowDrawGeometry.x(), nativeWindowDrawGeometry.y(),
-                nativeWindowDrawGeometry.width(), nativeWindowDrawGeometry.height(),
-                logicalGeometry.x(), logicalGeometry.y(),
-                logicalGeometry.width(), logicalGeometry.height());
-        fclose(gw);
-    }
+    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
+        "[geo.fromOhos] win=%{public}p type=%{public}d rect=%{public}d,%{public}d %{public}dx%{public}d",
+        (void *)window(), int(window()->type()),
+        nativeWindowDrawGeometry.x(), nativeWindowDrawGeometry.y(),
+        nativeWindowDrawGeometry.width(), nativeWindowDrawGeometry.height());
     QWindowSystemInterface::handleGeometryChange(window(), logicalGeometry);
 
     if (isExposed())
