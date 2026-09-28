@@ -100,6 +100,14 @@ public:
         const QList<QWindowSystemInterface::TouchPoint> &touchPoints);
     void onGestureEventFromNativeNode(const QOhosGestureEvent &gestureEvent);
 
+    // Wheel/axis events (mouse wheel, touchpad two-finger scroll) forwarded
+    // from the ArkTS XComponent's universal onAxisEvent callback. The axis
+    // values are in vp (== Qt logical units on this platform); the position
+    // is window-local.
+    void onAxisEventFromArkUi(
+        QWindow *targetWindow, double horizontalAxis, double verticalAxis,
+        double windowLocalX, double windowLocalY);
+
     void onKeyEvent(const QOhosKeyEvent &keyEvent, QWindow *targetWindow);
     void onMouseEvent(const QOhosMouseEvent &mouseEvent);
     void onHoverEvent(const QOhosHoverEvent &hoverEvent);

@@ -6,8 +6,12 @@
 #include <hilog/log.h>
 
 #include <QtCore/qscopeguard.h>
+#include <QtGui/qguiapplication.h>
+#include <QtGui/qwindow.h>
 #include <cstdint>
 #include <qarkui/qxcomponentregistry.h>
+#include <qohosinputmethodeventhandler.h>
+#include <qohosplatformintegration.h>
 #include <qohosutils.h>
 #include <render/qohoswindowproxy.h>
 #include <render/qxcomponent.h>
@@ -209,6 +213,34 @@ QNapi::Object makeLocalStorageForWindow(
             // Render-target XComponent (SURFACE type) sibling in the page;
             // its surface is captured by QXComponentRegistry.
             {"surfaceXComponentId", createInfo.xComponentId.stringId() + "_surf"},
+            // Wheel / touchpad-scroll axis events from the ArkTS XComponent's
+            // universal onAxisEvent callback; forwarded to this subwindow's
+            // owning Qt window as wheel events.
+            {
+                "onAxisEvent",
+                [owningWindowRef = createInfo.owningQWindowRef](const QtOhos::CallbackInfo &cbInfo) {
+                    QNapi::Number horizontalAxis;
+                    QNapi::Number verticalAxis;
+                    QNapi::Number windowX;
+                    QNapi::Number windowY;
+                    cbInfo.getLeadingArgs(
+                        "onAxisEvent", horizontalAxis, verticalAxis, windowX, windowY);
+                    const auto h = horizontalAxis.DoubleValue();
+                    const auto v = verticalAxis.DoubleValue();
+                    const auto x = windowX.DoubleValue();
+                    const auto y = windowY.DoubleValue();
+                    owningWindowRef.visitInQtThreadIfAlive(
+                        [owningWindowRef, h, v, x, y](auto &) {
+                            auto *qWindow = qobject_cast<QWindow *>(owningWindowRef.data());
+                            if (qWindow == nullptr)
+                                return;
+                            auto *imeHandler =
+                                QOhosPlatformIntegration::instance()->inputMethodEventHandler();
+                            if (imeHandler != nullptr)
+                                imeHandler->onAxisEventFromArkUi(qWindow, h, v, x, y);
+                        });
+                }
+            },
             {
                 "onDisAppear",
                 [xComponentId = createInfo.xComponentId.stringId()]() {

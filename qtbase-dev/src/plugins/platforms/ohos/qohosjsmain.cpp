@@ -26,6 +26,10 @@
 #include <QtCore/private/qcoreapplication_p.h>
 #include "qohoscloseeventcontext_p.h"
 #include "qohosplatformfontdatabase_p.h"
+#include "qohosinputmethodeventhandler.h"
+#include "qohosplatformintegration.h"
+#include <QtGui/qguiapplication.h>
+#include <QtGui/qwindow.h>
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
@@ -1403,6 +1407,39 @@ void loadWindowStageContentPage(JsState &jsState, QNapi::Object &qAbility, const
                         "onAppear",
                         [xComponentId]() {
                             qOhosPrintfDebug("XComponentId: %s onAppear", xComponentId.stringId().c_str());
+                        }
+                    },
+                    // Wheel / touchpad-scroll axis events from the ArkTS
+                    // XComponent's universal onAxisEvent callback; forwarded
+                    // to the main Qt window as wheel events.
+                    {
+                        "onAxisEvent",
+                        [](const QtOhos::CallbackInfo &cbInfo) {
+                            QNapi::Number horizontalAxis;
+                            QNapi::Number verticalAxis;
+                            QNapi::Number windowX;
+                            QNapi::Number windowY;
+                            cbInfo.getLeadingArgs(
+                                "onAxisEvent", horizontalAxis, verticalAxis, windowX, windowY);
+                            const auto h = horizontalAxis.DoubleValue();
+                            const auto v = verticalAxis.DoubleValue();
+                            const auto x = windowX.DoubleValue();
+                            const auto y = windowY.DoubleValue();
+                            QtOhos::invokeInQtThread([h, v, x, y]() {
+                                auto *imeHandler =
+                                    QOhosPlatformIntegration::instance()->inputMethodEventHandler();
+                                if (imeHandler == nullptr)
+                                    return;
+                                // This callback belongs to the main window page;
+                                // route the wheel to the visible main Qt window.
+                                for (QWindow *candidate : QGuiApplication::allWindows()) {
+                                    if (candidate->isVisible()
+                                        && candidate->type() == Qt::Window) {
+                                        imeHandler->onAxisEventFromArkUi(candidate, h, v, x, y);
+                                        return;
+                                    }
+                                }
+                            });
                         }
                     },
                 }),

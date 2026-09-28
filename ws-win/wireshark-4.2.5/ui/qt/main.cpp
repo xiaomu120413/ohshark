@@ -96,6 +96,8 @@
 #include <QMessageBox>
 #include <QScreen>
 #include <QTimer>
+#include <QAbstractScrollArea>
+#include <QScroller>
 #include <QLayout>
 
 #ifdef _WIN32
@@ -769,6 +771,22 @@ static int wireshark_app_main(int argc, char *qt_argv[])
     // Qt via the platform's geometry sync. Start maximized.
     main_w->show();
     main_w->showMaximized();
+    // HarmonyOS touch screens deliver drags as synthesized mouse events;
+    // desktop-style scroll areas don't scroll on drag. Grab Qt's kinetic
+    // touch scroller on every scroll area (packet list, detail tree, bytes
+    // pane) so a finger drag scrolls the content naturally. Tap-to-select
+    // still works — the scroller only claims drags.
+    {
+        // Deferred so widgets created during startup are included. Events
+        // are delivered to the viewport child, so the gesture must be
+        // grabbed on the viewport, not the scroll area itself.
+        QTimer::singleShot(0, main_w, [main_w]() {
+            for (auto *scrollArea : main_w->findChildren<QAbstractScrollArea *>()) {
+                if (auto *viewport = scrollArea->viewport())
+                    QScroller::grabGesture(viewport, QScroller::LeftMouseButtonGesture);
+            }
+        });
+    }
     // Setup GLib mainloop on Qt event loop to enable GLib and GIO watches
     GLibMainloopOnQEventLoop::setup(main_w);
     // We may not need a queued connection here but it would seem to make sense

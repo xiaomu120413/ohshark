@@ -379,3 +379,48 @@ DPR 修复后几何本来就正确了。真正的最后一环是 `onTouchEventFr
   Qt 状态机自行收敛，无可见副作用；后续可在 filterEvent 返回 true 消费掉。
 - 弹簧刀式 46 个重复 TouchBegin——同上。
 - 触控板物理手感需人工实测。
+
+## 十九、2026-09-28 晚：滚动三连修 + 沙箱恢复
+
+### 1. 触摸拖拽滚动（QScroller）
+
+- 现象：数据包列表触摸拖拽不滚动（桌面 Qt 滚动区不响应触摸拖拽）。
+- 方案：`main.cpp` 在主窗口 show 后 `QScroller::grabGesture(viewport,
+  LeftMouseButtonGesture)`（所有 QAbstractScrollArea 的 viewport——事件
+  落在 viewport 子控件上，grab 必须挂在 viewport 而非 scrollArea 本身）。
+- 实测：列表从第 2 行拖到第 556 行（含惯性），后续 715 行同样正常。
+
+### 2. 拖拽失效的深层根因：physicalSize 为 NaN（pixelPerMeter=0）
+
+- QScroller 拖拽阈值 `deltaPixel / ppm > dragStartDistance(米)`：
+  ppm=0 时 0/0=NaN，NaN>0.005 恒 false，`moveStarted` 永不触发。
+- ppm 来自 `QScreen::physicalDotsPerInch` → `physicalSize()`：
+  设备未报物理尺寸，`mapPixelsToMillimeters(pixels, dpi=0)` =
+  pixels/0 = **+inf**（不是 0！），`inf > 0` 的守卫挡不住它，
+  physicalDotsPerInch = size/inf×25.4 = **0**。
+- 修复：`QOhosPlatformScreen::physicalSize()` 兜底——报告值非有限或
+  ≤0 时按"参考 96dpi × densityPixels"换算毫米（2x 屏 ≈192dpi）。
+  ppm 从 0 → 2834，拖拽阈值（5mm≈14px）正常生效。
+
+### 3. 滚轮/双指滚动：平台级阻断（未解决，已绕过）
+
+四条路全部验证死路：
+1. ArkTS `onAxisEvent`（XComponent/Stack/Scroll 包裹）——axis 事件只
+   派发给 ArkUI 可滚动容器，普通组件回调不触发（Scroll 包裹还破坏
+   Qt 全屏布局，已回退）。
+2. NODE_ON_AXIS（节点树 axis handler）——节点树 hit-test 透明，
+   axis 永不达；恢复 hit-test 会吞掉触摸（回归验证后回退）。
+3. `OH_Input_AddAxisEventMonitorForAll`（进程级监听）——rc=201
+   权限拒绝（仅系统应用）。
+4. 签名 profile ACL 提升（apl=system_basic + allowed-acls）——
+   设备不认自签 profile 的 ACL，仍 rc=201（已回退）。
+- 事件确实到达 app 进程（InputKeyFlow axis-begin/end 可见），但被
+  ArkUI 手势管线消费。绕过方案：触摸拖拽滚动（上）+ 滚动条整页点击。
+
+### 4. 沙箱 sample.pcap 恢复流程
+
+卸载重装清空 `/data/app/el2/100/base/<bundle>/files/`。恢复：
+`hdc file send <本地> /data/local/tmp/sample.pcap`（本地路径必须用
+Windows 格式，MSYS 路径会被当目录同步）→ `hdc shell cp` 进沙箱 →
+重启应用。欢迎页"sample.pcap doesn't exist"即此因。日志工具悬浮窗
+（常驻进程杀不掉）抢前台时 `aa start` 提回。

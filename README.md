@@ -18,6 +18,10 @@ HarmonyOS NEXT arm64 真机（HUAWEI MateBook Pro，设备 ID `3QC0124C11000711`
 | 菜单/对话框=独立系统子窗口（1× 渲染，全部条目+快捷键列） | ✅ 实测通过 |
 | 菜单条目点击 → 触发动作 → 弹出对话框 → 对话框按钮交互 | ✅ 全链路实测通过 |
 | 触控板/鼠标 | ✅ 事件管线实测（DispatchMouseEvent）；物理手感待人工确认 |
+| 触摸拖拽滚动（数据包列表/树/字节窗格） | ✅ QScroller + physicalSize 兜底修复 |
+| 数据包行点击选中 / 滚动条整页点击 | ✅ 实测 |
+| 滚轮/触控板双指滚动 | ❌ 平台级阻断（axis 事件被 ArkUI 手势管线消费、
+  MMI 监听需系统权限），用触摸拖拽滚动替代 |
 | 抓包（dumpcap） | ⚠️ 真机无 root 受限，回退 pcap_findalldevs，主要用 sample.pcap 回放 |
 
 ## 仓库结构与工作区

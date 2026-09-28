@@ -5,6 +5,7 @@ interface WindowNativeNodeCreateInfo {
   onAppear: () => void
   onAttach: () => void
   onDisAppear: () => void
+  onAxisEvent?: (horizontalAxis: number, verticalAxis: number, windowX: number, windowY: number) => void
 }
 
 // The qohos native XComponent input path does not reliably deliver physical
@@ -54,6 +55,16 @@ struct WindowNativeNode {
         .onLoad(() => { if (this.createInfo) this.createInfo.onAttach(); })
         .onAppear(this.createInfo.onAppear)
         .onDisAppear(this.createInfo.onDisAppear)
+        .onAxisEvent((event: AxisEvent) => {
+          // Mouse wheel / touchpad two-finger scroll: forwarded to the Qt
+          // side as a wheel event on the owning window.
+          console.info('[OhShark] ETS onAxisEvent fired');
+          if (this.createInfo?.onAxisEvent !== undefined) {
+            this.createInfo.onAxisEvent(
+              event.getHorizontalAxisValue(), event.getVerticalAxisValue(),
+              event.windowX, event.windowY);
+          }
+        })
         .focusOnTouch(true)
         .onTouch((event: TouchEvent) => {
           const t = event.touches.length > 0 ? event.touches[0] :
@@ -87,6 +98,15 @@ struct WindowNativeNode {
         .height('100%')
       }
     }
+    .onAxisEvent((event: AxisEvent) => {
+      // Also capture axis events at the page root in case the XComponent
+      // does not claim them.
+      if (this.createInfo?.onAxisEvent !== undefined) {
+        this.createInfo.onAxisEvent(
+          event.getHorizontalAxisValue(), event.getVerticalAxisValue(),
+          event.windowX, event.windowY);
+      }
+    })
     .width('100%')
     .height('100%')
   }

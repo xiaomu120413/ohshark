@@ -313,6 +313,7 @@ QDpi QOhosPlatformScreen::logicalDpi() const
     return QDpi(lDpi, lDpi);
 }
 
+
 qreal QOhosPlatformScreen::pixelScalingCoefficient() const
 {
     // densityPixels is the scaling coefficient between the virtual pixel
@@ -444,7 +445,25 @@ QImage::Format QOhosPlatformScreen::format() const
 
 QSizeF QOhosPlatformScreen::physicalSize() const
 {
-    return m_displayInfo.physicalSize();
+    const QSizeF reported = m_displayInfo.physicalSize();
+    if (qIsFinite(reported.width()) && qIsFinite(reported.height())
+        && reported.width() > 0 && reported.height() > 0)
+        return reported;
+    // The display's physical size is not reported on this device (the
+    // display-info DPI is zero), so the computed size is zero as well. A
+    // zero physical size zeroes QScreen::physicalDotsPerInch and breaks
+    // every physical-unit consumer — most visibly QScroller, whose
+    // drag-start threshold becomes NaN so touch-drag scrolling never
+    // starts. Fall back to the reference dpi scaled by the display
+    // density (192 on a 2x display).
+    const qreal dpi = m_displayInfo.densityPixels * ohosLogicalDpi;
+    if (dpi <= 0)
+        return reported;
+    const QRect nativeGeometry = geometry();
+    constexpr double millimetersPerInch = 25.4;
+    return QSizeF(
+        nativeGeometry.width() / dpi * millimetersPerInch,
+        nativeGeometry.height() / dpi * millimetersPerInch);
 }
 
 void QOhosPlatformScreen::setAvailableGeometry(const QRect &rect)

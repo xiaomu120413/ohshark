@@ -3,6 +3,7 @@ interface SubWindowNativeNodeCreateInfo {
   surfaceXComponentId: string
   onAppear: () => void
   onDisAppear: () => void
+  onAxisEvent?: (horizontalAxis: number, verticalAxis: number, windowX: number, windowY: number) => void
 }
 
 @Entry
@@ -44,6 +45,15 @@ struct SubWindowNativeNode {
         })
         .onAppear(this.createInfo.onAppear)
         .onDisAppear(this.createInfo.onDisAppear)
+        .onAxisEvent((event: AxisEvent) => {
+          // Mouse wheel / touchpad two-finger scroll: forwarded to the Qt
+          // side as a wheel event on the owning window.
+          if (this.createInfo?.onAxisEvent !== undefined) {
+            this.createInfo.onAxisEvent(
+              event.getHorizontalAxisValue(), event.getVerticalAxisValue(),
+              event.windowX, event.windowY);
+          }
+        })
         .width('100%')
         .height('100%')
       }

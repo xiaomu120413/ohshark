@@ -213,9 +213,10 @@ std::shared_ptr<QQtEmbeddedWindowNode> QQtEmbeddedWindowNode::createOrFail(const
         std::make_tuple(::ARKUI_BLEND_MODE_SRC_OVER, ::BLEND_APPLY_TYPE_FAST));
     stackNode->setLengthMetricUnitOrFail(::ARKUI_LENGTH_METRIC_UNIT_PX);
     // Input is delivered through the ArkTS parent XComponent's
-    // DispatchTouchEvent/DispatchMouseEvent callbacks; the attached native
-    // tree must stay out of hit testing or it swallows every touch before
-    // they reach the XComponent.
+    // DispatchTouchEvent/DispatchMouseEvent callbacks; a hit-testable
+    // attached native tree swallows every touch before they reach the
+    // XComponent. Axis (wheel) events are handled separately (see
+    // QOhosInputMethodEventHandler::onAxisEventFromArkUi).
     stackNode->setAttributeOrFail(::NODE_HIT_TEST_BEHAVIOR, ::ARKUI_HIT_TEST_MODE_NONE);
 
     ::ArkUI_NodeAttributeType widthAttribute;
@@ -258,23 +259,12 @@ std::shared_ptr<QQtEmbeddedWindowNode> QQtEmbeddedWindowNode::createOrFail(const
         std::make_tuple(::ARKUI_BLEND_MODE_SRC_OVER, ::BLEND_APPLY_TYPE_FAST));
     xComponentNode->setAttributeOrFail(::NODE_FOCUSABLE, createInfo.focusable);
     xComponentNode->setAttributeOrFail(::NODE_RENDER_FIT, createInfo.renderFit);
+    xComponentNode->setAttributeOrFail(::NODE_HIT_TEST_BEHAVIOR, ::ARKUI_HIT_TEST_MODE_NONE);
     xComponentNode->setAttributeOrFail(::NODE_Z_INDEX, createInfo.zIndex);
     xComponentNode->setLengthMetricUnitOrFail(::ARKUI_LENGTH_METRIC_UNIT_PX);
-    xComponentNode->setAttributeOrFail(::NODE_HIT_TEST_BEHAVIOR, ::ARKUI_HIT_TEST_MODE_NONE);
 
     stackNode->addChildOrFail(*xComponentNode);
 
-    // Diagnostic: log native touch events on the stack node
-    stackNode->setEventHandler(
-        ::ArkUI_NodeEventType::NODE_TOUCH_EVENT,
-        [](::ArkUI_NodeEvent *) {
-            OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark", "STACK-TOUCH-EVENT");
-        });
-    stackNode->setEventHandler(
-        ::ArkUI_NodeEventType::NODE_EVENT_ON_APPEAR,
-        [](::ArkUI_NodeEvent *) {
-            OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark", "STACK-APPEAR");
-        });
 
     auto windowId = std::make_unique<QtOhos::WindowIdStruct>(QtOhos::WindowIdStruct{
         .nodeType = ::ArkUI_NodeType::ARKUI_NODE_XCOMPONENT,

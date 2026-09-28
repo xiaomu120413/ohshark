@@ -9,6 +9,7 @@
 #include "qohosplatformwindow.h"
 #include <QtCore/private/qohoslogger_p.h>
 #include <hilog/log.h>
+#include <multimodalinput/oh_input_manager.h>
 #include <QtCore/qmap.h>
 #include <QtGui/private/qguiapplication_p.h>
 #include <QtGui/private/qhighdpiscaling_p.h>
@@ -205,9 +206,26 @@ bool windowShouldTakeFocusOnPress(QWindow *qWindow)
 
 }
 
+namespace {
+void ohosAxisEventMonitorCallback(const Input_AxisEvent *axisEvent);
+}
+
 QOhosInputMethodEventHandler::QOhosInputMethodEventHandler(
     const std::set<QInputDevice::DeviceType> &deviceTypes)
 {
+    // Wheel / touchpad-scroll axis events never arrive through ArkUI on this
+    // platform (see ohosAxisEventMonitorCallback); register the process-level
+    // multimodal-input monitor once.
+    {
+        static bool axisMonitorRegistered = false;
+        if (!axisMonitorRegistered) {
+            axisMonitorRegistered = true;
+            const auto rc = OH_Input_AddAxisEventMonitorForAll(&ohosAxisEventMonitorCallback);
+            OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
+                "[axis.monitor] registered rc=%{public}d", int(rc));
+        }
+    }
+
     for (const auto &deviceType : deviceTypes)
         m_pointingDevices.emplace(deviceType, createPointingDevice(deviceType));
 
@@ -510,8 +528,109 @@ void QOhosInputMethodEventHandler::onHoverEvent(const QOhosHoverEvent &hoverEven
         QWindowSystemInterface::handleLeaveEvent(window);
 }
 
+namespace {
+
+// Process-level axis-event monitor (mouse wheel, touchpad two-finger scroll).
+// ArkUI never delivers axis events to this app's components (the ArkTS
+// universal onAxisEvent callback does not fire, and the native node axis
+// handlers sit on hit-test-transparent nodes), so hook the multimodal input
+// manager directly. Runs on an MMI thread; forwards to the Qt thread.
+void ohosAxisEventMonitorCallback(const Input_AxisEvent *axisEvent)
+{
+    if (axisEvent == nullptr)
+        return;
+
+    double verticalValue = 0.0;
+    double horizontalValue = 0.0;
+    float displayX = 0.f;
+    float displayY = 0.f;
+    std::ignore = OH_Input_GetAxisEventAxisValue(
+        axisEvent, AXIS_TYPE_SCROLL_VERTICAL, &verticalValue);
+    std::ignore = OH_Input_GetAxisEventAxisValue(
+        axisEvent, AXIS_TYPE_SCROLL_HORIZONTAL, &horizontalValue);
+    std::ignore = OH_Input_GetAxisEventDisplayX(axisEvent, &displayX);
+    std::ignore = OH_Input_GetAxisEventDisplayY(axisEvent, &displayY);
+
+    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
+        "[axis.monitor] v=%{public}.3f h=%{public}.3f display=%{public}.1f,%{public}.1f",
+        (float)verticalValue, (float)horizontalValue, displayX, displayY);
+
+    if (verticalValue == 0.0 && horizontalValue == 0.0)
+        return;
+
+    QtOhos::invokeInQtThread([verticalValue, horizontalValue, displayX, displayY]() {
+        auto *handler = QOhosPlatformIntegration::instance()->inputMethodEventHandler();
+        if (handler == nullptr)
+            return;
+        // Route to the smallest visible Qt window containing the cursor
+        // (display coordinates).
+        QWindow *bestWindow = nullptr;
+        qint64 bestArea = std::numeric_limits<qint64>::max();
+        for (QWindow *candidate : QGuiApplication::allWindows()) {
+            auto *platformWindow = QOhosPlatformWindow::fromQWindowOrNull(candidate);
+            if (platformWindow == nullptr || !candidate->isVisible())
+                continue;
+            const QRect geometry = platformWindow->geometry(); // native px
+            if (!geometry.contains(QPoint(int(displayX), int(displayY))))
+                continue;
+            const qint64 area = qint64(geometry.width()) * geometry.height();
+            if (area < bestArea) {
+                bestArea = area;
+                bestWindow = candidate;
+            }
+        }
+        if (bestWindow == nullptr)
+            return;
+        const QRect geometry =
+            QOhosPlatformWindow::fromQWindow(bestWindow)->geometry();
+        // Display coordinates are physical pixels; convert to the window's
+        // local logical (vp == Qt logical) coordinates.
+        const double localX = (displayX - geometry.x()) / 2.0;
+        const double localY = (displayY - geometry.y()) / 2.0;
+        handler->onAxisEventFromArkUi(
+            bestWindow, horizontalValue, verticalValue, localX, localY);
+    });
+}
+
+} // namespace
+
+void QOhosInputMethodEventHandler::onAxisEventFromArkUi(
+    QWindow *targetWindow, double horizontalAxis, double verticalAxis,
+    double windowLocalX, double windowLocalY)
+{
+    if (targetWindow == nullptr)
+        return;
+
+    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
+        "[axis.ark] win=%{public}p h=%{public}.2f v=%{public}.2f pos=%{public}.1f,%{public}.1f",
+        (void *)targetWindow, (float)horizontalAxis, (float)verticalAxis,
+        (float)windowLocalX, (float)windowLocalY);
+
+    QOhosWheelEvent event{};
+    event.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    // Axis values and coordinates arrive in vp, which equals Qt logical
+    // units on this platform (the display density is 2).
+    event.localPoint = QPointF(windowLocalX, windowLocalY);
+    event.globalPoint = QPointF(windowLocalX, windowLocalY);
+    event.horizontalValue = horizontalAxis;
+    event.verticalValue = verticalAxis;
+    // The ArkTS AxisEvent API exposes no source device; treat everything as
+    // a mouse wheel (the mouse scaling clamps each event to a single notch,
+    // which keeps touchpad-generated pixel deltas sane as well).
+    event.eventToolType = ::UI_INPUT_EVENT_TOOL_TYPE_MOUSE;
+    event.scrollPhase = Qt::ScrollUpdate;
+    event.wheelScrollLines = 3;
+
+    onMouseWheelEvent(event, targetWindow);
+}
+
 void QOhosInputMethodEventHandler::onMouseWheelEvent(const QOhosWheelEvent &event, QWindow *window)
 {
+    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
+        "[wheel] win=%{public}p v=%{public}.3f h=%{public}.3f tool=%{public}d local=%{public}.1f,%{public}.1f",
+        (void *)window, (float)event.verticalValue, (float)event.horizontalValue,
+        int(event.eventToolType), (float)event.localPoint.x(), (float)event.localPoint.y());
     constexpr int angleXMin = -120;
     constexpr int angleXMax = 120;
     constexpr int xAxisValueMultiplier = -10;
