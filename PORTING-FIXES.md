@@ -424,3 +424,36 @@ DPR 修复后几何本来就正确了。真正的最后一环是 `onTouchEventFr
 Windows 格式，MSYS 路径会被当目录同步）→ `hdc shell cp` 进沙箱 →
 重启应用。欢迎页"sample.pcap doesn't exist"即此因。日志工具悬浮窗
 （常驻进程杀不掉）抢前台时 `aa start` 提回。
+
+## 二十、2026-09-29：键盘链路修复 + 滚轮窗口过滤转发
+
+### 1. 键盘（PageDown/字母/快捷键全通）
+
+- 根因：`enableNativeNodeApiKeyEvents=true` 走 NODE_ON_KEY_EVENT 节点路径，
+  但节点树永不获得 ArkUI 焦点（焦点在 ets XComponent 上）——按键到达
+  app 进程（ImsaKit/InputKeyFlow 可见）却无人处理。
+- 修复（两处）：
+  1. `enableNativeNodeApiKeyEvents=false` → XComponentCallbackDispatcher
+     改注册 `OH_NativeXComponent_RegisterKeyEventCallback`（ets XComponent
+     级回调，与鼠标同构）；
+  2. ets XComponent 加 `.focusable(true).defaultFocus(true)`——按键派发
+     要求 ArkUI 焦点，`focusOnTouch(true)` 不足以获得初始焦点。
+- 实测：PageDown 点击行后滚列表（1→30+ 行）；显示过滤框点击后打字
+  "dns" 出现在框内；Esc 清除。
+
+### 2. 滚轮：窗口鼠标过滤转发（等待物理触控板验证）
+
+- 发现：`OH_NativeWindowManager_RegisterMouseEventFilter` 的
+  `Input_MouseEvent` 携带 `MOUSE_ACTION_AXIS_*` 动作和
+  `OH_Input_GetMouseEventAxisType/AxisValue` 滚轮数据——这是无系统权限
+  拿滚轮的唯一通道。
+- 实现：`QArkUi::MouseEvent` 增加 axisType/axisValue 字段；
+  `onMouseEventFromArkUi` 对 AXIS_* 动作换算窗口本地逻辑坐标后调
+  `onAxisEventFromArkUi` → Qt wheel。
+- 遗憾：`uinput -M -s` 注入的滚轮事件不经过窗口过滤（只在 ArkUI ITK
+  里出现，PanVelocity=0 疑似注入缺 delta），远程无法验证；
+  真实触控板双指滚动待人工实测。代码路径已就绪。
+
+### 3. 鼠标右键：注入按钮事件不触发 XComponent DispatchMouseEvent
+  （只有 move 触发），窗口过滤的客户端区按键事件只转发非客户区——
+  真实触控板/外接鼠标的右键待人工实测；触摸长按可出上下文菜单。

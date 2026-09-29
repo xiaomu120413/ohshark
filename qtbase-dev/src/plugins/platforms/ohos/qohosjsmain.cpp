@@ -113,7 +113,11 @@ std::atomic<bool> experimentalEnableGlBackinStore{false};
 std::atomic<bool> debugUseBasicStyleAndTheme{false};
 std::atomic<bool> debugDrawQtRasterBackingStoreFlushedRegion{false};
 std::atomic<bool> vsyncOnSoftwareBackingStoreEnabled{true};
-std::atomic<bool> enableNativeNodeApiKeyEvents{true};
+// The ArkUI native-node key-event path never receives focus on this
+// platform (the focused ets XComponent is not the node-tree child), so the
+// XComponent-level OH_NativeXComponent key callback is the only working key
+// source.
+std::atomic<bool> enableNativeNodeApiKeyEvents{false};
 // The ArkUI native-node mouse-event path never delivers events on this
 // build: the node tree is hit-test-transparent, so the XComponent-level
 // DispatchMouseEvent callbacks are the only working mouse source.

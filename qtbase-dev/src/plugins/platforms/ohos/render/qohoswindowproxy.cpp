@@ -5,6 +5,7 @@
 
 #include <qohosinputmethodeventhandler.h>
 #include <qohosplatformintegration.h>
+#include <qohosplatformwindow.h>
 #include <QtGui/qwindow.h>
 
 #include <QtCore/qcoreapplication.h>
@@ -1613,6 +1614,44 @@ bool QOhosWindowProxy::JsScopeData::isWindowClosing() const
 
 void QOhosWindowProxy::JsScopeData::onMouseEventFromArkUi(const QArkUi::MouseEvent &event)
 {
+    // Wheel / touchpad-scroll axis events arrive here as mouse events with
+    // MOUSE_ACTION_AXIS_* actions (the XComponent axis callbacks never fire on
+    // this platform). Forward them to the Qt wheel pipeline.
+    if (event.action == ::MOUSE_ACTION_AXIS_BEGIN
+        || event.action == ::MOUSE_ACTION_AXIS_UPDATE
+        || event.action == ::MOUSE_ACTION_AXIS_END) {
+        if (event.axisValue == 0.f)
+            return;
+        QtOhos::QObjectThreadSafeRef qWindowRef = jsWindowRef->owningQWindowRef();
+        qWindowRef.visitInQtThreadIfAlive(
+            [qWindowRef, axisType = event.axisType, axisValue = event.axisValue,
+             displayPosition = QPointF(event.displayPosition),
+             actionTime = event.actionTime](auto &) {
+                auto *qWindow = qobject_cast<QWindow *>(qWindowRef.data());
+                if (qWindow == nullptr)
+                    return;
+                auto *imeHandler =
+                    QOhosPlatformIntegration::instance()->inputMethodEventHandler();
+                if (imeHandler == nullptr)
+                    return;
+                auto *platformWindow = QOhosPlatformWindow::fromQWindowOrNull(qWindow);
+                if (platformWindow == nullptr)
+                    return;
+                // displayPosition is physical pixels; convert to the
+                // window's local logical (vp == Qt logical) coordinates.
+                const QRect geometry = platformWindow->geometry();
+                const double localX = (displayPosition.x() - geometry.x()) / 2.0;
+                const double localY = (displayPosition.y() - geometry.y()) / 2.0;
+                const bool vertical = axisType == ::MOUSE_AXIS_SCROLL_VERTICAL;
+                imeHandler->onAxisEventFromArkUi(
+                    qWindow,
+                    vertical ? 0.0 : axisValue,
+                    vertical ? axisValue : 0.0,
+                    localX, localY);
+            });
+        return;
+    }
+
     if (nonClientAreaMouseEventConsumer == nullptr)
         return;
 

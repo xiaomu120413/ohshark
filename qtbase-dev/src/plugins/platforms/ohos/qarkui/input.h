@@ -29,6 +29,10 @@ struct MouseEvent
     QPoint displayPosition;
     QPoint globalPosition;
     std::chrono::microseconds actionTime;
+    // Populated for MOUSE_ACTION_AXIS_* events: the wheel axis and its
+    // scrolled value (positive = away from the user).
+    std::int32_t axisType = -1;
+    float axisValue = 0.f;
 
     static std::optional<MouseEvent> createFromNativeEvent(const ::Input_MouseEvent *event);
 };

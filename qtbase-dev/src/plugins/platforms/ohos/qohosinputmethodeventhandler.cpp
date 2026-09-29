@@ -452,6 +452,8 @@ void QOhosInputMethodEventHandler::onGestureEventFromNativeNode(const QOhosGestu
 
 void QOhosInputMethodEventHandler::onKeyEvent(const QOhosKeyEvent &keyEvent, QWindow *targetWindow)
 {
+    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
+        "[key.event] win=%{public}p", (void *)targetWindow);
     const auto optQOhosQtKeyEvent = keyEvent.tryConvertToQOhosQtKeyEvent();
     if (!optQOhosQtKeyEvent.has_value())
         return;

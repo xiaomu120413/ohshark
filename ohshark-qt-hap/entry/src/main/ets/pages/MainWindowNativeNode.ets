@@ -65,6 +65,8 @@ struct WindowNativeNode {
               event.windowX, event.windowY);
           }
         })
+        .focusable(true)
+        .defaultFocus(true)
         .focusOnTouch(true)
         .onTouch((event: TouchEvent) => {
           const t = event.touches.length > 0 ? event.touches[0] :

@@ -103,6 +103,8 @@ std::optional<MouseEvent> MouseEvent::createFromNativeEvent(const ::Input_MouseE
         .displayPosition = displayPosition,
         .globalPosition = mapFromDisplayToGlobal(displayPosition, displayId),
         .actionTime = std::chrono::microseconds(::OH_Input_GetMouseEventActionTime(event)),
+        .axisType = ::OH_Input_GetMouseEventAxisType(event),
+        .axisValue = ::OH_Input_GetMouseEventAxisValue(event),
     };
 
     return mouseEvent;
