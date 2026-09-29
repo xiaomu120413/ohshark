@@ -470,3 +470,27 @@ Windows 格式，MSYS 路径会被当目录同步）→ `hdc shell cp` 进沙箱
 - 修复：覆盖改为警告+替换（预建半途与 fallback 的第二窗口才是活的）。
 - 验证：11 次连续 launch/force-stop 循环零新增 crash；菜单→Options 对话框
   →Close→渲染 全部回归通过。
+
+## 二十二、2026-09-29：点击详情面板渲染损坏（damage 区域 y 翻转）
+
+- 现象（用户报告"点击详情就没了"）：点击 packet detail 树任意行 →
+  详情区被巨大蓝色块覆盖 + 其余行消失（灰色空底）。
+- 三层逐层取证（图像/buffer 转储对比）：
+  1. backing store 图像：**正确**（Frame 1/Linux/IP/UDP/DNS 全渲染）；
+  2. 拷贝后的原生 buffer：**正确**（与图像一致）；
+  3. 屏幕显示：**错误**——呈现的是中间帧（选中蓝块）。
+- 根因：`makeOhosRegionRectsForFlush` 把 damage 矩形做了 **y 翻转**
+  （`dstHeight - y - h`，OpenGL 表面惯例）。软件渲染的 buffer 是
+  top-left 原点——翻转后的 damage 指向镜像区域（详情树的 flush
+  [116,1000 3000x882] 被报为 y≈3 顶部），render service 认为
+  实际变更区"未损坏"，继续显示旧 buffer 的中间帧。
+  全窗口 flush（[0,0 3120x1886]）翻转后仍覆盖全屏，所以初始渲染
+  和大多数操作从不暴露此 bug；只有小区域 flush（详情树选中
+  重绘）才触发。
+- 修复：damage 矩形直接用 top-left 原点（去掉翻转）。
+- 验证：详情树 6 行分别点击全部正常（选中行文字+高亮完整，
+  状态栏字段联动）；拖拽滚动（556 行）、菜单、Options 对话框、
+  Close 回归全过。
+- 附带：QScroller 抓取排除 ProtoTree/ByteViewTabWidget（树视图
+  点击选中优先于拖拽滚动——判别实验证明 scroller 非根因但排除
+  仍属合理）。

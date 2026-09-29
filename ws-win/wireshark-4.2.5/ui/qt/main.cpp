@@ -782,6 +782,13 @@ static int wireshark_app_main(int argc, char *qt_argv[])
         // grabbed on the viewport, not the scroll area itself.
         QTimer::singleShot(0, main_w, [main_w]() {
             for (auto *scrollArea : main_w->findChildren<QAbstractScrollArea *>()) {
+                // Skip the packet detail tree and bytes view: the scroller's
+                // press filtering interferes with their field selection.
+                const QString className = QString::fromLatin1(
+                    scrollArea->metaObject()->className());
+                if (className == QLatin1String("ProtoTree")
+                    || className == QLatin1String("ByteViewTabWidget"))
+                    continue;
                 if (auto *viewport = scrollArea->viewport())
                     QScroller::grabGesture(viewport, QScroller::LeftMouseButtonGesture);
             }

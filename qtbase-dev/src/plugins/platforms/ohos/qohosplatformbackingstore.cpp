@@ -118,9 +118,17 @@ std::vector<::Region::Rect> makeOhosRegionRectsForFlush(
         std::transform(
             region.begin(), region.end(), std::back_inserter(rects),
             [&](const auto &qrect) {
+                // The damage region is in the buffer's top-left origin
+                // coordinate system, same as the QImage we painted into.
+                // The previous bottom-left y-flip (an OpenGL-surface
+                // convention) mis-pointed the damage at the mirrored area,
+                // so the render service considered the actually changed
+                // area undamaged and kept showing a stale intermediate
+                // frame there (visible as the corrupted packet detail pane
+                // after selection).
                 return ::Region::Rect{
                     .x = qrect.x() + rootWindowOffset.x(),
-                    .y = (dstImageSize.height() - qrect.y()) + rootWindowOffset.y() - qrect.height(),
+                    .y = qrect.y() + rootWindowOffset.y(),
                     .w = static_cast<std::uint32_t>(qrect.width()),
                     .h = static_cast<std::uint32_t>(qrect.height()),
                 };
