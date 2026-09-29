@@ -457,3 +457,16 @@ Windows 格式，MSYS 路径会被当目录同步）→ `hdc shell cp` 进沙箱
 ### 3. 鼠标右键：注入按钮事件不触发 XComponent DispatchMouseEvent
   （只有 move 触发），窗口过滤的客户端区按键事件只转发非客户区——
   真实触控板/外接鼠标的右键待人工实测；触摸长按可出上下文菜单。
+
+## 二十一、2026-09-29：启动竞态 crash（setQWindow 二次覆盖 abort）
+
+- 现象：偶发启动崩溃，faultlog: `LastFatalMessage:[NAPI] Crash occurred on
+  ProcessAsyncHandle`，符号化（重建未 strip .so）定位到
+  `QAbilityPeerImpl::setQWindow` 的"overwriting previously set qwindow"致命断言。
+- 日志链：`tryCreate: MainWindow, preCreated proxy=(nil)`（预建代理跨库
+  dlsym 存取竞态未就绪）→ fallback `createForExistingMainWindow` →
+  `makeWindowProxyDataForExistingMainWindowInJsThread` → setQWindow，而该
+  peer 在预建流程中已被 set 过一次 → abort。
+- 修复：覆盖改为警告+替换（预建半途与 fallback 的第二窗口才是活的）。
+- 验证：11 次连续 launch/force-stop 循环零新增 crash；菜单→Options 对话框
+  →Close→渲染 全部回归通过。

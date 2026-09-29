@@ -205,7 +205,12 @@ void QAbilityPeerImpl::setQWindow(Napi::Env env, QObjectThreadSafeRef qwindow)
         Q_FUNC_INFO, m_instanceId.c_str(), m_qwindow.refName().c_str());
 
     if (m_qwindow != QObjectThreadSafeRef()) {
-        qOhosReportFatalErrorAndAbort(
+        // The pre-created main window proxy path can start an ability
+        // instance and set its qwindow, while a fallback creation (when the
+        // pre-created proxy is not yet visible to this library copy) sets
+        // it again for the real window. The second window is the live one;
+        // replace instead of aborting.
+        qOhosPrintfWarning(
             "QAbilityPeerImpl: overwriting previously set qwindow: %s => %s",
             m_qwindow.refName().c_str(), qwindow.refName().c_str());
     }
