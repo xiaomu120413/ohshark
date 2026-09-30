@@ -494,3 +494,22 @@ Windows 格式，MSYS 路径会被当目录同步）→ `hdc shell cp` 进沙箱
 - 附带：QScroller 抓取排除 ProtoTree/ByteViewTabWidget（树视图
   点击选中优先于拖拽滚动——判别实验证明 scroller 非根因但排除
   仍属合理）。
+
+## 二十三、2026-09-30：运行期无父窗口误判主窗口 → 注册表二次消费崩溃
+
+- 用户报告："详情点击就关闭了窗口"。faultlog：14:41 crash，进程存活
+  90 秒（非启动崩溃），栈在 makeWindowProxyDataForExistingMainWindowInJsThread。
+- 根因链：determineViewTypeAndLogicalParent 的兜底分支把**任何**无父、
+  无 transientParent、无 tag 的窗口判为 MainWindow。启动时正确（它就是
+  主窗口），但运行期创建的此类窗口（无合成父的 tooltip、辅助窗口、
+  脱离视图）会走 tryCreate 的 fallback createForExistingMainWindow →
+  setQWindow（已改警告）→ takeNodeXComponentFromRegistryOrFail ——
+  主 XComponent 注册表条目启动时已被消费（tryTake 是移除式）→
+  **abort → 进程死亡 → 用户看到"窗口关闭"**。
+- 修复：兜底判 MainWindow 前检查已存在 MainWindow 视图——存在则改走
+  SubWindow(syntheticParent)（菜单/对话框同款已验证路径）。启动首窗
+  无其他窗口 → 仍判 MainWindow ✓。
+- 诊断：[viewtype] 日志转 hilog（每次窗口定型记录类型/父/tag），再触发
+  即可定位具体窗口。
+- 验证：详情多行点击/展开箭头/双击/悬停/鼠标点击/菜单/对话框/Close/
+  拖拽滚动 全部存活，重启后详情渲染完整。

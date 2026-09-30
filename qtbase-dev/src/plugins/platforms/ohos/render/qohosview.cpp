@@ -238,13 +238,10 @@ ViewTypeInfo determineViewTypeAndLogicalParent(const QOhosPlatformWindow *platfo
 
     QWindow *subWindowTagValue = platformWindow->validSubWindowOfTagValueOrNull();
 
-    if (FILE *vtLog = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
-        fprintf(vtLog, "[viewtype] win=%p '%s' type=%d parent=%p transient=%p tag=%p\n",
-                (void *)qWindow, qWindow->metaObject()->className(),
-                int(windowType), (void *)parent, (void *)transientParent,
-                (void *)subWindowTagValue);
-        fclose(vtLog);
-    }
+    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
+        "[viewtype] win=%{public}p type=%{public}d parent=%{public}p transient=%{public}p tag=%{public}p",
+        (void *)qWindow, int(windowType), (void *)parent, (void *)transientParent,
+        (void *)subWindowTagValue);
 
     static QSet<Qt::WindowType> fallbackToSubWindowWindowTypes{
         Qt::Popup,
@@ -301,6 +298,37 @@ ViewTypeInfo determineViewTypeAndLogicalParent(const QOhosPlatformWindow *platfo
             .viewType = ViewType::SubWindow,
             .optLogicalParent = syntheticParent,
         };
+    }
+
+    // A parentless window that reaches this point would be classified as a
+    // second main window. At startup that is correct (it is THE main
+    // window), but at runtime any additional parentless top-level window
+    // (tooltip without a synthetic parent, auxiliary window, detached view)
+    // must not create another main-window proxy: the main XComponent
+    // registry entry was already consumed, and the re-creation aborts the
+    // process. Route such windows as subwindows of the existing main
+    // window instead — the same, proven path menus and dialogs use.
+    if (syntheticParent != nullptr) {
+        bool mainWindowAlreadyExists = false;
+        for (QWindow *candidate : QGuiApplication::allWindows()) {
+            if (candidate == qWindow || !candidate->isVisible())
+                continue;
+            auto *candidatePlatformWindow = QOhosPlatformWindow::fromQWindowOrNull(candidate);
+            if (candidatePlatformWindow == nullptr)
+                continue;
+            auto *candidateView = candidatePlatformWindow->ownedViewOrNull();
+            if (candidateView != nullptr
+                && candidateView->viewType() == ViewType::MainWindow) {
+                mainWindowAlreadyExists = true;
+                break;
+            }
+        }
+        if (mainWindowAlreadyExists) {
+            return ViewTypeInfo {
+                .viewType = ViewType::SubWindow,
+                .optLogicalParent = syntheticParent,
+            };
+        }
     }
 
     return ViewTypeInfo {
