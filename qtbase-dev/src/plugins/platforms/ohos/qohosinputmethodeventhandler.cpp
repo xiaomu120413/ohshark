@@ -274,12 +274,6 @@ void QOhosInputMethodEventHandler::onTouchEventFromXComponent(
 {
     // ohshark diag: every touch entering the Qt pipeline from either the
     // XComponent callback (main window) or the ArkTS filter forwarding (floats)
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-        "[xcomp.touch] win=%{public}p pts=%{public}zu p0=%{public}.1f,%{public}.1f t0=%{public}d",
-        (void *)targetWindow, touchPoints.size(),
-        touchPoints.empty() ? -1.f : (float)touchPoints.front().displayPosition.x(),
-        touchPoints.empty() ? -1.f : (float)touchPoints.front().displayPosition.y(),
-        touchPoints.empty() ? -1 : int(touchPoints.front().touchPoint.type));
 
     // Embedded popup/dialog windows render into the main window's surface,
     // so their touches arrive here addressed to the main window. Re-target
@@ -315,9 +309,6 @@ void QOhosInputMethodEventHandler::onTouchEventFromXComponent(
             }
         }
         if (bestWindow != nullptr) {
-            OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-                "[touch.redirect] %{public}p -> %{public}p",
-                (void *)targetWindow, (void *)bestWindow);
             targetWindow = bestWindow;
         }
     }
@@ -357,15 +348,6 @@ void QOhosInputMethodEventHandler::onTouchEventFromXComponent(
                 const QRect diagGeom = diagPw ? diagPw->geometry() : QRect();
                 const QMargins diagMargins = diagPw ? diagPw->frameMargins() : QMargins();
                 const QRect diagQGeom = targetWindow->geometry();
-                OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-                    "[touch.map] win=%{public}p state=%{public}d normal=%{public}.3f,%{public}.3f "
-                    "pgeom=[%{public}d,%{public}d %{public}dx%{public}d] margins=[%{public}d,%{public}d,%{public}d,%{public}d] qgeom=[%{public}d,%{public}d %{public}dx%{public}d]",
-                    (void *)targetWindow, int(state),
-                    (float)qwsiTouchPoint.normalPosition.x(),
-                    (float)qwsiTouchPoint.normalPosition.y(),
-                    diagGeom.x(), diagGeom.y(), diagGeom.width(), diagGeom.height(),
-                    diagMargins.left(), diagMargins.top(), diagMargins.right(), diagMargins.bottom(),
-                    diagQGeom.x(), diagQGeom.y(), diagQGeom.width(), diagQGeom.height());
             }
             qwsiTouchPoint.area = calculateTouchPointArea(clickPoint + displayOffset);
             wsiTouchPoints.push_back(qwsiTouchPoint);
@@ -452,8 +434,6 @@ void QOhosInputMethodEventHandler::onGestureEventFromNativeNode(const QOhosGestu
 
 void QOhosInputMethodEventHandler::onKeyEvent(const QOhosKeyEvent &keyEvent, QWindow *targetWindow)
 {
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-        "[key.event] win=%{public}p", (void *)targetWindow);
     const auto optQOhosQtKeyEvent = keyEvent.tryConvertToQOhosQtKeyEvent();
     if (!optQOhosQtKeyEvent.has_value())
         return;
@@ -553,9 +533,6 @@ void ohosAxisEventMonitorCallback(const Input_AxisEvent *axisEvent)
     std::ignore = OH_Input_GetAxisEventDisplayX(axisEvent, &displayX);
     std::ignore = OH_Input_GetAxisEventDisplayY(axisEvent, &displayY);
 
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-        "[axis.monitor] v=%{public}.3f h=%{public}.3f display=%{public}.1f,%{public}.1f",
-        (float)verticalValue, (float)horizontalValue, displayX, displayY);
 
     if (verticalValue == 0.0 && horizontalValue == 0.0)
         return;
@@ -603,10 +580,6 @@ void QOhosInputMethodEventHandler::onAxisEventFromArkUi(
     if (targetWindow == nullptr)
         return;
 
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-        "[axis.ark] win=%{public}p h=%{public}.2f v=%{public}.2f pos=%{public}.1f,%{public}.1f",
-        (void *)targetWindow, (float)horizontalAxis, (float)verticalAxis,
-        (float)windowLocalX, (float)windowLocalY);
 
     QOhosWheelEvent event{};
     event.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -629,10 +602,6 @@ void QOhosInputMethodEventHandler::onAxisEventFromArkUi(
 
 void QOhosInputMethodEventHandler::onMouseWheelEvent(const QOhosWheelEvent &event, QWindow *window)
 {
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-        "[wheel] win=%{public}p v=%{public}.3f h=%{public}.3f tool=%{public}d local=%{public}.1f,%{public}.1f",
-        (void *)window, (float)event.verticalValue, (float)event.horizontalValue,
-        int(event.eventToolType), (float)event.localPoint.x(), (float)event.localPoint.y());
     constexpr int angleXMin = -120;
     constexpr int angleXMax = 120;
     constexpr int xAxisValueMultiplier = -10;

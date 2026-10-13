@@ -4,7 +4,6 @@
 
 #include "qmenu.h"
 
-#include <QtCore/private/qohoslogger_p.h>
 #include <QtWidgets/private/qtwidgetsglobal_p.h>
 #include <QtWidgets/private/qwidgetwindow_p.h>
 
@@ -2930,15 +2929,6 @@ void QMenu::wheelEvent(QWheelEvent *e)
 void QMenu::mousePressEvent(QMouseEvent *e)
 {
     Q_D(QMenu);
-    {
-        QAction *dbgAction = d->actionAt(e->position().toPoint());
-        qOhosPrintfInfo("[menu.press] pos=%.1f,%.1f rect=%dx%d contains=%d action=%s cur=%s",
-                e->position().x(), e->position().y(),
-                rect().width(), rect().height(),
-                int(rect().contains(e->position().toPoint())),
-                dbgAction ? dbgAction->text().toUtf8().constData() : "null",
-                d->currentAction ? d->currentAction->text().toUtf8().constData() : "null");
-    }
     if (d->aboutToHide || d->mouseEventTaken(e))
         return;
     // Workaround for XCB on multiple screens which doesn't have offset. If the menu is open on one screen
@@ -2969,14 +2959,6 @@ void QMenu::mousePressEvent(QMouseEvent *e)
 void QMenu::mouseReleaseEvent(QMouseEvent *e)
 {
     Q_D(QMenu);
-    {
-        QAction *dbgAction = d->actionAt(e->position().toPoint());
-        qOhosPrintfInfo("[menu.release] pos=%.1f,%.1f action=%s cur=%s mouseDown=%s",
-                e->position().x(), e->position().y(),
-                dbgAction ? dbgAction->text().toUtf8().constData() : "null",
-                d->currentAction ? d->currentAction->text().toUtf8().constData() : "null",
-                QMenuPrivate::mouseDown ? "yes" : "null");
-    }
     if (d->aboutToHide || d->mouseEventTaken(e))
         return;
 #if QT_CONFIG(menubar)

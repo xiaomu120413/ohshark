@@ -521,14 +521,6 @@ void QWidgetWindow::handleMouseEvent(QMouseEvent *event)
     // so we need QPointer to avoid a dangling d below
     QPointer<QWidgetWindow> self = this;
 
-    {
-        QWidget *hit = m_widget ? m_widget->childAt(event->position().toPoint()) : nullptr;
-        qOhosPrintfInfo("[ww.mouse] type=%d pos=%.1f,%.1f popup=%s hit=%s mw=%s",
-                int(event->type()), event->position().x(), event->position().y(),
-                QApplication::activePopupWidget() ? "yes" : "none",
-                hit ? hit->metaObject()->className() : "null",
-                m_widget ? m_widget->metaObject()->className() : "?");
-    }
 
     if (auto *activePopupWidget = QApplication::activePopupWidget()) {
         QPointF mapped = event->position();
@@ -722,10 +714,6 @@ void QWidgetWindow::handleMouseEvent(QMouseEvent *event)
 
 void QWidgetWindow::handleTouchEvent(QTouchEvent *event)
 {
-    qOhosPrintfInfo("[ww.touch] mw=%s type=%d pts=%d popup=%s",
-                    m_widget ? m_widget->metaObject()->className() : "?",
-                    int(event->type()), int(event->points().size()),
-                    QApplication::activePopupWidget() ? "yes" : "none");
     if (event->type() == QEvent::TouchCancel) {
         QApplicationPrivate::translateTouchCancel(event->pointingDevice(), event->timestamp());
         event->accept();

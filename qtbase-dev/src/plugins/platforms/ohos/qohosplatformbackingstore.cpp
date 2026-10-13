@@ -238,13 +238,6 @@ void QOhosPlatformBackingStore::flush(QWindow *window, const QRegion &region, co
     auto *surface = platformWindow != nullptr ? platformWindow->ownedSurfaceOrNull() : nullptr;
     auto bounds = region.translated(offset).boundingRect() & m_image.rect();
 
-    // ohshark diag: which window and native surface each raster flush targets
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-        "[rbs.flush] win=%{public}p surface=%{public}p native=%{public}p bounds=[%{public}d,%{public}d %{public}dx%{public}d]",
-        (void *)window, (void *)surface,
-        surface ? (void *)surface->nativeWindow() : nullptr,
-        bounds.x(), bounds.y(), bounds.width(), bounds.height());
-
     if (bounds.isEmpty())
         return;
 
@@ -452,13 +445,6 @@ bool QOhosPlatformBackingStore::scroll(const QRegion &area, int dx, int dy)
 
 void QOhosPlatformBackingStore::beginPaint(const QRegion &region)
 {
-    // ohshark diag
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-        "[bs.beginPaint] win=%{public}p requested=%{public}dx%{public}d img=%{public}dx%{public}d imgDpr=%{public}.2f handleDpr=%{public}.2f",
-        (void *)window(), m_requestedSize.width(), m_requestedSize.height(),
-        m_image.width(), m_image.height(),
-        (float)m_image.devicePixelRatio(),
-        window()->handle() ? (float)window()->handle()->devicePixelRatio() : -1.0);
     auto previousImageSize = m_image.size();
     QRasterBackingStore::beginPaint(region);
     bool imageWasResized = previousImageSize != m_image.size();
@@ -487,28 +473,6 @@ void QOhosPlatformBackingStore::flushImmediate(QWindow *window)
     // the window actually is, instead of overwriting the main window's origin.
     QPoint sharedSurfaceOffset = sharedSurfaceOffsetFor(window, nativeWindow);
 
-    // ohshark diag
-    {
-        const QRect qg = window->geometry();
-        const QRect pg = platformWindow != nullptr ? platformWindow->geometry() : QRect();
-        const qreal winDpr = window->devicePixelRatio();
-        const qreal scrDpr = window->screen() != nullptr ? window->screen()->devicePixelRatio() : -1.0;
-        const qreal hdFactor = QHighDpiScaling::factor(window->screen());
-        auto *diagMain = mainQtWindowOrNull();
-        const auto bufGeom = QOhosSurface::tryGetBufferGeometryForWindow(nativeWindow);
-        OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-            "[rbs.flushImm] win=%{public}p root=%{public}d framePos=%{public}d,%{public}d sharedOff=%{public}d,%{public}d img=%{public}dx%{public}d "
-            "qgeom=[%{public}d,%{public}d %{public}dx%{public}d] pgeom=[%{public}d,%{public}d %{public}dx%{public}d] winDpr=%{public}.2f scrDpr=%{public}.2f hd=%{public}.2f mainDpr=%{public}.2f buf=%{public}dx%{public}d",
-            (void *)window, int(isRootWindow),
-            window->framePosition().x(), window->framePosition().y(),
-            sharedSurfaceOffset.x(), sharedSurfaceOffset.y(),
-            m_image.width(), m_image.height(),
-            qg.x(), qg.y(), qg.width(), qg.height(),
-            pg.x(), pg.y(), pg.width(), pg.height(),
-            (float)winDpr, (float)scrDpr, (float)hdFactor,
-            (float)(diagMain ? diagMain->devicePixelRatio() : -1.0),
-            bufGeom ? bufGeom->width() : -1, bufGeom ? bufGeom->height() : -1);
-    }
 
     auto &windowContext = m_windowContextManager.getOrCreateWindowContext(window, nativeWindow);
     QRegion region;
@@ -585,36 +549,6 @@ void QOhosPlatformBackingStore::flushImmediate(QWindow *window)
                     if (otherStore->m_image.isNull())
                         continue;
                     const QPoint otherOffset = sharedSurfaceOffsetFor(otherWindow, nativeWindow);
-                    // ohshark diag
-                    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-                        "[rbs.composite] other=%{public}p off=%{public}d,%{public}d img=%{public}dx%{public}d",
-                        (void *)otherWindow, otherOffset.x(), otherOffset.y(),
-                        otherStore->m_image.width(), otherStore->m_image.height());
-                    // ohshark diag: bounding box of dark (content) pixels in
-                    // the full image, to locate where the window content is
-                    // actually painted.
-                    {
-                        const QImage &im = otherStore->m_image;
-                        int minX = INT_MAX, minY = INT_MAX, maxX = -1, maxY = -1;
-                        for (int y = 0; y < im.height(); y += 2) {
-                            const QRgb *line = reinterpret_cast<const QRgb *>(im.constScanLine(y));
-                            for (int x = 0; x < im.width(); x += 2) {
-                                const QRgb px = line[x];
-                                if (qAlpha(px) > 32 && qGray(px) < 220) {
-                                    if (x < minX) minX = x;
-                                    if (y < minY) minY = y;
-                                    if (x > maxX) maxX = x;
-                                    if (y > maxY) maxY = y;
-                                }
-                            }
-                        }
-                        OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-                            "[menu.contentBB] img=%{public}dx%{public}d format=%{public}d bb=[%{public}d,%{public}d %{public}dx%{public}d]",
-                            im.width(), im.height(), int(im.format()),
-                            minX, minY,
-                            minX == INT_MAX ? 0 : maxX - minX + 1,
-                            minY == INT_MAX ? 0 : maxY - minY + 1);
-                    }
                     {
                         static int dumpCount = 0;
                         if (dumpCount < 3) {
