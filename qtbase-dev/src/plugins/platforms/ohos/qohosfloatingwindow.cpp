@@ -60,13 +60,7 @@ void QOhosFloatingWindow::setGeometry(const QRect &rect)
     // window works in NATIVE pixels and Qt converts native<->logical at the
     // QWindow boundary. Store every incoming rect raw.
     const QRect &adjustedRect = rect;
-    // ohshark diag
-    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
-        "[fw.setGeometry] win=%{public}p rect=%{public}d,%{public}d %{public}dx%{public}d type=%{public}d",
-        (void *)window(),
-        adjustedRect.x(), adjustedRect.y(), adjustedRect.width(), adjustedRect.height(),
-        int(window()->type()));
-    auto *view = ownedViewOrNull();
+auto *view = ownedViewOrNull();
     bool geometryControlledBySystem =
         !QOhosSettings::instance().isWindowPcModeEnabled()
         && view != nullptr

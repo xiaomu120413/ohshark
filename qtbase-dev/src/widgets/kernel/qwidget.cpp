@@ -8125,19 +8125,6 @@ void QWidgetPrivate::show_sys()
 
     auto window = qobject_cast<QWidgetWindow *>(windowHandle());
 
-    // ohshark diag: log top-level dialog windows when they appear, so dialog
-    // popups opened from menus can be confirmed from qt_debug.log
-    if (q->isWindow() && (q->windowType() & Qt::Dialog)) {
-        if (FILE *df = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
-            const QPoint originL = q->mapToGlobal(QPoint(0, 0));
-            fprintf(df, "[dlg.show] class=%s title='%s' origin=%d,%d size=%dx%d\n",
-                    q->metaObject()->className(),
-                    q->windowTitle().toUtf8().constData(),
-                    originL.x(), originL.y(), q->width(), q->height());
-            fclose(df);
-        }
-    }
-
     if (q->testAttribute(Qt::WA_DontShowOnScreen)) {
         invalidateBackingStore(q->rect());
         q->setAttribute(Qt::WA_Mapped);

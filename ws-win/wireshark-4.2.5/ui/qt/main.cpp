@@ -789,8 +789,21 @@ static int wireshark_app_main(int argc, char *qt_argv[])
                 if (className == QLatin1String("ProtoTree")
                     || className == QLatin1String("ByteViewTabWidget"))
                     continue;
-                if (auto *viewport = scrollArea->viewport())
+                if (auto *viewport = scrollArea->viewport()) {
                     QScroller::grabGesture(viewport, QScroller::LeftMouseButtonGesture);
+                    // Lock the gesture to the dominant axis: synthesized
+                    // touch moves jitter by a few pixels, which the scroller
+                    // would otherwise interpret as a horizontal flick that
+                    // shifts the view ±150px sideways on every tap and
+                    // corrupts the row area (the old selection highlight
+                    // stays visible after the selection moves).
+                    if (QScroller *scroller = QScroller::scroller(viewport)) {
+                        QScrollerProperties properties = scroller->scrollerProperties();
+                        properties.setScrollMetric(
+                            QScrollerProperties::AxisLockThreshold, 1.0);
+                        scroller->setScrollerProperties(properties);
+                    }
+                }
             }
         });
     }
@@ -1193,6 +1206,13 @@ int main(int argc, char *qt_argv[])
     // app sandbox, leaving that dir empty and QApplication qFatal'ing. Point
     // the loader at the real file before any QApplication exists.
     qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "/data/storage/el1/bundle/libs/arm64");
+    // The ohos QStyle plugin (libqohosstyle.so) lives in the flat bundle
+    // libs dir; without this Qt scans only the default plugin paths, never
+    // finds it and silently falls back to the Fusion style — which draws
+    // the menu bar transparent, leaving dark-on-dark menu titles.
+    qputenv("QT_PLUGIN_PATH", "/data/storage/el1/bundle/libs/arm64");
+    // QStyleFactory scans only <libpath>/styles for style plugins; the
+    // bundle keeps them there (see entry/libs/arm64-v8a/styles).
 
     // HarmonyOS sandbox: point Wireshark's personal config and data dirs (and
     // HOME, which glib uses) at writable locations, otherwise startup fails to

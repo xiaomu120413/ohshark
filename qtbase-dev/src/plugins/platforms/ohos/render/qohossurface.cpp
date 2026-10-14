@@ -49,7 +49,10 @@ void setupNativeWindowBufferFormat(::OHNativeWindow *nativeWindow)
     auto setFormatRes = ::OH_NativeWindow_NativeWindowHandleOpt(
         nativeWindow, ::NativeWindowOperation::SET_FORMAT, QOhosSurface::bufferFormat);
     if (Q_UNLIKELY(setFormatRes != ohNativeWindowErrorCodeSuccess)) {
-        qOhosReportFatalErrorAndAbort(
+        // Not fatal: the surface may allocate with its default format, which
+        // the flush path maps below. Aborting here kills the whole app the
+        // first time a subwindow surface rejects the request.
+        qCWarning(QtForOhos,
             "%s: QOhosNativeXComponent: error setting window buffer format: %d",
             Q_FUNC_INFO, setFormatRes);
     }
@@ -133,7 +136,13 @@ QOhosSurface::mapNativeBufferFormatToQImageFormatOrFail(std::int32_t format)
         result = QImage::Format_ARGB32_Premultiplied;
         break;
     default:
-        qOhosReportFatalErrorAndAbort("%s: unsupported format %d", Q_FUNC_INFO, format);
+        // Not fatal: aborting here on an unexpected buffer format kills the
+        // app the first time a surface reports it. Fall back to the
+        // premultiplied ARGB mapping (the overwhelmingly common layout) so
+        // rendering continues; the mismatch, if any, is a visual artifact.
+        qCWarning(QtForOhos, "%s: unsupported buffer format %d, assuming BGRA_8888", Q_FUNC_INFO, format);
+        result = QImage::Format_ARGB32_Premultiplied;
+        break;
     }
 
     return result;

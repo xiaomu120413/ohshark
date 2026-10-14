@@ -825,9 +825,19 @@ void QOhosView::showWindow()
         ohosPlatformWindow->shouldShowWindowWithoutActivating() ? 0 : 1);
     m_ohosWindowProxy->showWindow(
         QOhosWindowProxy::ShowWindowOptions{
-            .focusOnShow = ohosPlatformWindow->shouldShowWindowWithoutActivating()
+            // Subwindows (menus, dialogs) must not take the ArkUI window
+            // focus: the hardware-key events are only delivered to the
+            // focused window's node chain, and a subwindow page has no
+            // focusable node with a key callback — focusing it would
+            // silently drop every key press, including Esc to close a
+            // dialog. Keep the main window focused; the plugin's key
+            // handler re-targets the events to the Qt dialog window.
+            .focusOnShow = (viewType() == ViewType::SubWindow
+                            || viewType() == ViewType::FloatWindow)
                 ? std::optional(false)
-                : std::nullopt,
+                : (ohosPlatformWindow->shouldShowWindowWithoutActivating()
+                    ? std::optional(false)
+                    : std::nullopt),
         });
 }
 
@@ -921,13 +931,6 @@ void QOhosView::updateWindowBackgroundTransparency(bool transparent)
             ->window()
             .color()
             .rgb();
-        if (FILE *bgLog = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
-            fprintf(bgLog, "[bg.set] view=%p window=%s transparent=%d\n",
-                    (void *)this,
-                    m_ownerWindow ? m_ownerWindow->metaObject()->className() : "?",
-                    int(transparent));
-            fclose(bgLog);
-        }
         m_ohosWindowProxy->setWindowBackgroundColor(
             transparent
                 ? QColor(Qt::transparent)

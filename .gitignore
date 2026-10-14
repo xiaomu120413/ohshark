@@ -65,6 +65,10 @@
 /qtbase-dev/src/widgets/kernel/*
 !/qtbase-dev/src/widgets/kernel/qwidget.cpp
 !/qtbase-dev/src/widgets/kernel/qwidgetwindow.cpp
+!/qtbase-dev/src/widgets/itemviews/
+/qtbase-dev/src/widgets/itemviews/*
+!/qtbase-dev/src/widgets/itemviews/qabstractitemview.cpp
+!/qtbase-dev/src/widgets/itemviews/qtreeview.cpp
 !/qtbase-dev/src/widgets/widgets/
 /qtbase-dev/src/widgets/widgets/*
 !/qtbase-dev/src/widgets/widgets/qmenu.cpp
@@ -113,6 +117,8 @@
 !/ws-win/wireshark-4.2.5/ui/qt/
 /ws-win/wireshark-4.2.5/ui/qt/*
 !/ws-win/wireshark-4.2.5/ui/qt/main.cpp
+!/ws-win/wireshark-4.2.5/ui/qt/packet_list.cpp
+!/ws-win/wireshark-4.2.5/ui/qt/packet_list.h
 !/ws-win/wireshark-4.2.5/capture/
 /ws-win/wireshark-4.2.5/capture/*
 !/ws-win/wireshark-4.2.5/capture/capture_ifinfo.c

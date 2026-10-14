@@ -283,14 +283,6 @@ void QMenuBarPrivate::popupAction(QAction *action, bool activateFirst)
         activeMenuPriv->causedPopup.action = action;
 
         QRect adjustedActionRect = actionRect(action);
-        // ohshark diag: which menubar item opened the menu, and where it is
-        if (FILE *df = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
-            const QRect g = QRect(q->mapToGlobal(adjustedActionRect.topLeft()),
-                                  adjustedActionRect.size());
-            fprintf(df, "[bar.popup] item='%s' globalRect=%d,%d %dx%d\n",
-                    action->text().toUtf8().constData(), g.x(), g.y(), g.width(), g.height());
-            fclose(df);
-        }
         QPoint popupPos = adjustedActionRect.bottomLeft() + QPoint(0, 1);
 
         //we put the popup menu on the screen containing the bottom-center of the action rect

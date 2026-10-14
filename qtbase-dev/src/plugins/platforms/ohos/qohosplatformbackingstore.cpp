@@ -332,11 +332,19 @@ void QOhosPlatformBackingStore::BufferRegionHandler::storeRegionForBufferHandle(
 {
     m_buffersToFlushSequenceIds[bufferHandle] = m_flushSequenceId;
 
-    if (m_buffersToFlushSequenceIds.size() > m_bufferQueueSize) {
-        m_buffersToFlushSequenceIds.clear();
-        m_lastFlushedRegions.clear();
-        m_flushSequenceId = 0;
-        return;
+    // The render service may hand out more distinct buffer handles than the
+    // queue size suggests (e.g. after queue reallocation). Evict only the
+    // oldest handle instead of clearing the whole map: clearing resets every
+    // buffer to "never flushed", after which mergeRegionForBufferHandle
+    // returns no region for each of them and the next flush presents a
+    // complete buffer with ZERO damage rects — the render service then keeps
+    // the previous frame and the update is silently lost on screen (observed
+    // as packet-list selection changes that never appear).
+    while (m_buffersToFlushSequenceIds.size() > m_bufferQueueSize) {
+        auto oldestEntryIt = std::min_element(
+            m_buffersToFlushSequenceIds.begin(), m_buffersToFlushSequenceIds.end(),
+            [](const auto &lhs, const auto &rhs) { return lhs.second < rhs.second; });
+        m_buffersToFlushSequenceIds.erase(oldestEntryIt);
     }
 
     m_lastFlushedRegions.push_back(region);
@@ -549,17 +557,6 @@ void QOhosPlatformBackingStore::flushImmediate(QWindow *window)
                     if (otherStore->m_image.isNull())
                         continue;
                     const QPoint otherOffset = sharedSurfaceOffsetFor(otherWindow, nativeWindow);
-                    {
-                        static int dumpCount = 0;
-                        if (dumpCount < 3) {
-                            dumpCount++;
-                            QImage dump = otherStore->m_image;
-                            if (dump.format() != QImage::Format_ARGB32)
-                                dump = dump.convertToFormat(QImage::Format_ARGB32);
-                            dump.save(QStringLiteral("/data/storage/el2/base/files/menu_dump_%1.png")
-                                          .arg(dumpCount));
-                        }
-                    }
                     // The raster image is larger than the window's native
                     // size (the backing store scales by the platform-window
                     // devicePixelRatio on top of the already-native
@@ -576,26 +573,21 @@ void QOhosPlatformBackingStore::flushImmediate(QWindow *window)
                     if (otherSrc.bytesPerPixel() != qImageBytesPerPixel(dstImage))
                         continue;
                     copyImage(otherSrc, dstImage, QRegion(QRect({}, otherSrc.size())), otherOffset);
-                    {
-                        static int bufDumpCount = 0;
-                        if (bufDumpCount < 2) {
-                            bufDumpCount++;
-                            QImage bufDump = dstImage.copy(
-                                QRect(otherOffset.x(), otherOffset.y(),
-                                      qMin(otherSrc.size().width(), dstImage.width() - otherOffset.x()),
-                                      qMin(otherSrc.size().height(), dstImage.height() - otherOffset.y())));
-                            bufDump.save(QStringLiteral("/data/storage/el2/base/files/buffer_dump_%1.png")
-                                             .arg(bufDumpCount));
-                        }
-                    }
                 }
             }
 
             if (m_debugDrawFlushedRegion)
                 debugDrawFlushedQRegion(dstImage, rootWindowRegionToFlush);
 
+            // When the per-buffer merge has no state for this buffer the code
+            // above already copies the ENTIRE image into it, so the damage
+            // must cover the entire buffer as well. Returning an empty region
+            // would tell the render service "nothing changed" and the
+            // presented frame would be silently dropped (stale screen).
+            const QRegion &damageRegion = mergedRegionOpt.value_or(
+                QRegion(QRect(QPoint{}, dstImage.size())));
             return makeOhosRegionRectsForFlush(
-                mergedRegionOpt.value_or(QRegion()),
+                damageRegion,
                 (isRootWindow ? QPoint{} : rootWindowOffset) + sharedSurfaceOffset, dstImage.size());
         },
         [&](::BufferHandle *bufferHandle) {

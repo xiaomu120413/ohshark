@@ -156,21 +156,16 @@ std::string getDefaultFontFamily(QtOhos::JsState &jsState)
 
 void registerSystemFonts()
 {
-    auto dbg = fopen("/data/storage/el2/base/files/qt_debug.log", "a");
     QStringList fontPaths;
     // Always seed fontconfig with the OHOS system font directory so glyphs
     // (Latin + CJK) resolve even when the JS font query is unavailable during
     // QApplication construction. Without this every label renders as tofu.
     fontPaths.append(QStringLiteral("/system/fonts"));
-    if (dbg) fprintf(dbg, "[font.reg] base /system/fonts added\n");
     try {
         const auto installed = getInstalledFontPaths();
-        if (dbg) fprintf(dbg, "[font.reg] installed paths: %d\n", int(installed.size()));
         fontPaths.append(installed);
     } catch (const std::exception &e) {
-        if (dbg) fprintf(dbg, "[font.reg] getInstalledFontPaths threw: %s\n", e.what());
     } catch (...) {
-        if (dbg) fprintf(dbg, "[font.reg] getInstalledFontPaths threw non-std exception\n");
     }
     fontPaths.removeDuplicates();
 
@@ -187,21 +182,15 @@ void registerSystemFonts()
     }
 
     FcConfig *config = FcConfigGetCurrent();
-    if (dbg) fprintf(dbg, "[font.reg] config=%p dirs=%d\n", (void *)config, int(uniqueFontDirs.size()));
     if (config != nullptr) {
         for (const QString &dir : uniqueFontDirs) {
             const bool ok = FcConfigAppFontAddDir(
                 config, reinterpret_cast<const FcChar8 *>(dir.toUtf8().constData()));
-            if (dbg)
-                fprintf(dbg, "[font.reg] AddDir '%s' -> %d\n", dir.toUtf8().constData(), int(ok));
         }
         const bool built = FcConfigBuildFonts(config);
         FcObjectSet *os = FcObjectSetBuild(FC_FAMILY, nullptr);
         FcPattern *pat = FcPatternCreate();
         FcFontSet *set = FcFontList(config, pat, os);
-        if (dbg)
-            fprintf(dbg, "[font.reg] build=%d fontlist=%d\n", int(built),
-                    set ? set->nfont : -1);
         if (set)
             FcFontSetDestroy(set);
         FcPatternDestroy(pat);
@@ -210,7 +199,6 @@ void registerSystemFonts()
         qOhosPrintfError("Failed to get fontconfig current configuration.");
         std::abort();
     }
-    if (dbg) fclose(dbg);
 }
 
 }
@@ -222,14 +210,10 @@ void QOhosPlatformFontDatabase::setOhosNoUiChildMode()
 
 void QOhosPlatformFontDatabase::populateFontDatabase()
 {
-    auto dbg = fopen("/data/storage/el2/base/files/qt_debug.log", "a");
-    if (dbg) { fprintf(dbg, "[font.db] populate enter FcInit=%d\n", int(FcInit())); fclose(dbg); }
 
     registerSystemFonts();
 
     QFontconfigDatabase::populateFontDatabase();
-    dbg = fopen("/data/storage/el2/base/files/qt_debug.log", "a");
-    if (dbg) { fprintf(dbg, "[font.db] populate done\n"); fclose(dbg); }
 }
 
 QStringList QOhosPlatformFontDatabase::fallbacksForFamily(const QString &family,
@@ -269,12 +253,6 @@ QFont QOhosPlatformFontDatabase::defaultFont() const
                     return QString::fromStdString(getDefaultFontFamily(jsState));
                 },
                 Q_FUNC_INFO);
-    if (FILE *df = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
-        fprintf(df, "[font.def] families=%d chosen='%s'\n",
-                int(QFontDatabase::families().size()),
-                defaultFontFamily.toUtf8().constData());
-        fclose(df);
-    }
     return QFont(defaultFontFamily);
 }
 

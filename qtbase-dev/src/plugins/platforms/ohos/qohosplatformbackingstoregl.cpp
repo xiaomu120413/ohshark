@@ -166,18 +166,6 @@ void QOhosPlatformBackingStoreGL::flush(
     auto optSrcWindowCtxData = RenderContextData::tryCreateForQWindow(window());
     auto optDstWidnowCtxData = RenderContextData::tryCreateForQWindow(targetWindow);
 
-    // ohshark diag: track which window/surface each flush targets
-    if (FILE *df = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
-        fprintf(df, "[bs.flush] own=%p '%s' target=%p '%s' srcCtx=%d dstCtx=%d ctx=%d\n",
-                (void *)window(),
-                window() ? window()->metaObject()->className() : "?",
-                (void *)targetWindow,
-                targetWindow ? targetWindow->metaObject()->className() : "?",
-                optSrcWindowCtxData.has_value(),
-                optDstWidnowCtxData.has_value(),
-                m_glContext ? 1 : 0);
-        fclose(df);
-    }
 
     if (!optSrcWindowCtxData.has_value() || !optDstWidnowCtxData.has_value())
         return;

@@ -1686,31 +1686,19 @@ void QOhosWindowProxy::JsScopeData::onMouseEventFromArkUi(const QArkUi::MouseEve
 
 void QOhosWindowProxy::JsScopeData::onTouchEventFromArkUi(const QArkUi::TouchEvent &event)
 {
-    // ohshark diag: every window-level ArkTS filter touch, with the window
-    // rects used for the client/non-client classification
-    if (FILE *df = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
-        const auto dbgProps = QArkUi::tryGetWindowProperties(event.jsWindowId);
-        if (dbgProps.has_value()) {
-            const auto &wp = dbgProps.value();
-            fprintf(df, "[ark.touch] proxy=%d action=%d pos=%d,%d winRect=%d,%d %dx%d drawRect=%d,%d %dx%d\n",
-                    int(windowProxyType), int(event.action),
-                    event.displayPosition.x(), event.displayPosition.y(),
-                    wp.windowRect.x(), wp.windowRect.y(), wp.windowRect.width(), wp.windowRect.height(),
-                    wp.drawableRect.x(), wp.drawableRect.y(), wp.drawableRect.width(), wp.drawableRect.height());
-        } else {
-            fprintf(df, "[ark.touch] proxy=%d action=%d pos=%d,%d winProps=none\n",
-                    int(windowProxyType), int(event.action),
-                    event.displayPosition.x(), event.displayPosition.y());
-        }
-        fclose(df);
-    }
     // HarmonyOS input routing: for floating windows and subwindows (menus,
     // dialogs) the native OH_NativeXComponent DispatchTouchEvent never fires —
     // the window-level ArkTS touch filter is the only delivery path, and this
     // handler used to forward only non-client-area (title bar) touches,
     // silently dropping everything else. Without the forwarding below, Qt
     // popup content renders but never receives a single touch event.
-    if (windowProxyType != WindowProxyType::MainWindow) {
+    {
+        // All window types forward client-area touches through this filter.
+        // The filter consumes the event (see window_manager.cpp
+        // EventConsumersMap::filterEvent), so the XComponent dispatch path
+        // no longer delivers a second copy — the main window included: it
+        // previously relied on that second copy while the filter dropped
+        // client-area touches for MainWindow proxies.
         const auto optWindowProperties = QArkUi::tryGetWindowProperties(event.jsWindowId);
         const bool inNonClientArea = optWindowProperties.has_value()
             && isPointInNonClientArea(event.displayPosition, optWindowProperties.value());

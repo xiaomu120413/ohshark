@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
 
 #include <qarkui/window_manager.h>
+#include <qarkui/window.h>
 
 #include <hilog/log.h>
 #include <cstdint>
@@ -168,13 +169,44 @@ bool EventConsumersMap<Traits>::filterEvent(typename Traits::RawEventType *event
         "FILTER event: %p", event);
     auto jsWindowId = Traits::extractWindowIdFromEvent(event);
     auto optMappedEvent = MappedEventType::createFromNativeEvent(event);
-    if (optMappedEvent.has_value())
+    if (optMappedEvent.has_value()) {
+        // System-decorated subwindows (dialogs) draw their title bar outside
+        // the drawable rect. Events in that strip belong to the system
+        // decoration: consuming them here would disable the close /
+        // minimize buttons and native dragging, so pass them through
+        // untouched instead of forwarding them to Qt.
+        if constexpr (std::is_same_v<MappedEventType, QArkUi::TouchEvent>
+                      || std::is_same_v<MappedEventType, QArkUi::MouseEvent>) {
+            const auto optWindowProperties = QArkUi::tryGetWindowProperties(jsWindowId);
+            if (optWindowProperties.has_value()) {
+                // drawableRect is relative to windowRect; the frame between
+                // them is the system decoration (title bar with close /
+                // minimize buttons, borders). Touches there must reach the
+                // system decor: consuming them would disable those buttons.
+                const QRect drawableRectInScreenSpace = optWindowProperties->drawableRect
+                    .translated(optWindowProperties->windowRect.topLeft());
+                const bool inSystemDecorFrame = !drawableRectInScreenSpace.contains(
+                                                      optMappedEvent->displayPosition)
+                    && optWindowProperties->windowRect.contains(optMappedEvent->displayPosition);
+                if (inSystemDecorFrame) {
+                    OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
+                        "FILTER pass-through (system decor frame): window=%{public}f", jsWindowId.value());
+                    return false;
+                }
+            }
+        }
         instance().m_mtSafeEventsConsumerProxy(std::make_tuple(jsWindowId, optMappedEvent.value()));
-    else
+    } else {
         qOhosPrintfWarning("%s: jsWindowId: %f, Failed to map native event type", Q_FUNC_INFO, jsWindowId.value());
+    }
     OH_LOG_Print(LOG_APP, LOG_INFO, 0x0500, "OhShark",
         "FILTER done: window=%{public}f mapped=%{public}d", jsWindowId.value(), optMappedEvent.has_value());
-    return false;
+    // Consume events we successfully mapped and forwarded to Qt. Returning
+    // false lets the same event continue into ArkUI dispatch and reach the
+    // XComponent callbacks a second time; every gesture is then delivered to
+    // Qt twice (46+46 events), and menu-bar mouse-tracking sees a stream of
+    // interleaved moves that instantly close a just-opened menu.
+    return optMappedEvent.has_value();
 }
 
 template<typename Traits>

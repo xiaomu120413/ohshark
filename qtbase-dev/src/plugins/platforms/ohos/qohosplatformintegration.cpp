@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
 
 #include <QtGlobal>
+#include <sys/stat.h>
 
 #include "private/qohosplatformtheme_p.h"
 #include "qohosapplicationstatetracker.h"
@@ -133,12 +134,14 @@ void ohsharkFileMessageHandler(QtMsgType type, const QMessageLogContext &context
                                const QString &msg)
 {
     static FILE *f = []() -> FILE * {
+        mkdir("/data/storage/el2/base/files", 0700);
         return fopen("/data/storage/el2/base/files/qt_debug.log", "a");
     }();
-    if (f == nullptr)
-        return;
-    fprintf(f, "[%s] %s\n", context.category, msg.toUtf8().constData());
-    fflush(f);
+    if (f != nullptr) {
+        fprintf(f, "[%s] %s\n", context.category, msg.toUtf8().constData());
+        fflush(f);
+    }
+    fprintf(stderr, "[%s] %s\n", context.category, msg.toUtf8().constData());
 }
 } // namespace
 

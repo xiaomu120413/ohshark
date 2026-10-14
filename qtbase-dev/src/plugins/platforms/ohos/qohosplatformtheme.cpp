@@ -477,6 +477,19 @@ QPalette makeSystemPalette(const AllPalletesColors &palettesColors)
             {QPalette::Disabled, QPalette::Window, palettesColors.palettes.inactiveWindow},
             {QPalette::Inactive, QPalette::Window, palettesColors.palettes.inactiveWindow},
 
+            // The Button/ButtonText pair must be set explicitly: leaving them
+            // at the QPalette() defaults (black text) makes dark-theme
+            // consumers that draw with palette().buttonText() — the menu bar
+            // in particular — render black-on-black, visually erasing every
+            // menu title.
+            {QPalette::Active, QPalette::Button, palettesColors.palettes.activeWindow},
+            {QPalette::Disabled, QPalette::Button, palettesColors.palettes.inactiveWindow},
+            {QPalette::Inactive, QPalette::Button, palettesColors.palettes.inactiveWindow},
+
+            {QPalette::Active, QPalette::ButtonText, palettesColors.palettes.textPrimary},
+            {QPalette::Disabled, QPalette::ButtonText, palettesColors.palettes.disabledTextPrimary},
+            {QPalette::Inactive, QPalette::ButtonText, palettesColors.palettes.inactiveTextPrimary},
+
             {QPalette::Active, QPalette::WindowText, palettesColors.palettes.textPrimary},
             {QPalette::Disabled, QPalette::WindowText, palettesColors.palettes.disabledTextPrimary},
             {QPalette::Inactive, QPalette::WindowText, palettesColors.palettes.inactiveTextPrimary},
@@ -557,6 +570,13 @@ QPalette makeMenuBarPalette(const AllPalletesColors &palettesColors)
 {
     return makePalette(
         {
+            // The Window role must be set explicitly: leaving it at the
+            // QPalette() default paints the bar black while the text keeps
+            // the theme text color, rendering every menu title invisible.
+            {QPalette::Active, QPalette::Window, palettesColors.palettes.activeWindow},
+            {QPalette::Disabled, QPalette::Window, palettesColors.palettes.inactiveWindow},
+            {QPalette::Inactive, QPalette::Window, palettesColors.palettes.inactiveWindow},
+
             {QPalette::Active, QPalette::ButtonText, palettesColors.palettes.textPrimary},
             {QPalette::Disabled, QPalette::ButtonText, palettesColors.menu.inactiveText},
             {QPalette::Inactive, QPalette::ButtonText, palettesColors.menu.inactiveText},

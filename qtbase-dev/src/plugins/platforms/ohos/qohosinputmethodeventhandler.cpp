@@ -272,9 +272,6 @@ void QOhosInputMethodEventHandler::onTouchEventFromXComponent(
     const std::vector<QOhosTouchEventTouchPointData> &touchPoints,
     QInputDevice::DeviceType deviceType, QFlags<OhosKeyboardModifier> modifiers)
 {
-    // ohshark diag: every touch entering the Qt pipeline from either the
-    // XComponent callback (main window) or the ArkTS filter forwarding (floats)
-
     // Embedded popup/dialog windows render into the main window's surface,
     // so their touches arrive here addressed to the main window. Re-target
     // the event to the embedded window under the touch point (smallest
@@ -312,6 +309,20 @@ void QOhosInputMethodEventHandler::onTouchEventFromXComponent(
             targetWindow = bestWindow;
         }
     }
+
+    // Touch should move the Qt focus window with it, mirroring click-to-
+    // activate on desktop: the ohos platform otherwise never activates the
+    // embedded popup/dialog windows, so keyboard input (hardware keys, soft
+    // keyboard) stays addressed to the main window — with a modal dialog
+    // open those keys are dropped by the modal check and even Esc cannot
+    // close the dialog. Activate the (possibly re-targeted) window on the
+    // first contact.
+    if (targetWindow != nullptr && !touchPoints.empty()
+        && touchPoints.front().touchPoint.type == ::OH_NATIVEXCOMPONENT_DOWN
+        && QGuiApplication::focusWindow() != targetWindow) {
+        QWindowSystemInterface::handleFocusWindowChanged(targetWindow);
+    }
+
     auto *touchDevice = getPointingDeviceOrCreate(deviceType);
 
     QList<QWindowSystemInterface::TouchPoint> wsiTouchPoints;
@@ -343,12 +354,6 @@ void QOhosInputMethodEventHandler::onTouchEventFromXComponent(
             qwsiTouchPoint.normalPosition =
                 calculateTouchPointNormalPosition(targetWindow, clickPoint);
             qwsiTouchPoint.state = state;
-            {
-                auto *diagPw = QOhosPlatformWindow::fromQWindowOrNull(targetWindow);
-                const QRect diagGeom = diagPw ? diagPw->geometry() : QRect();
-                const QMargins diagMargins = diagPw ? diagPw->frameMargins() : QMargins();
-                const QRect diagQGeom = targetWindow->geometry();
-            }
             qwsiTouchPoint.area = calculateTouchPointArea(clickPoint + displayOffset);
             wsiTouchPoints.push_back(qwsiTouchPoint);
             break;
@@ -414,6 +419,22 @@ void QOhosInputMethodEventHandler::onTouchEventFromXComponent(
         };
 
         handleTouchEvent(touchEvent);
+
+        // A touch screen has no persistent pointer: once the last contact
+        // ends no further mouse moves arrive, but Qt synthesized mouse
+        // moves (and thus hover) from the touch. Without a leave event the
+        // hover sticks to the last touched widget forever — e.g. the packet
+        // list keeps the touched row highlighted while the selection moves
+        // away with the keyboard. Clear it like a mouse cursor leaving.
+        if (deviceType == QInputDevice::DeviceType::TouchScreen && targetWindow != nullptr) {
+            const bool allReleased = std::all_of(
+                wsiTouchPoints.cbegin(), wsiTouchPoints.cend(),
+                [](const QWindowSystemInterface::TouchPoint &point) {
+                    return point.state == QEventPoint::State::Released;
+                });
+            if (allReleased)
+                QWindowSystemInterface::handleLeaveEvent(targetWindow);
+        }
     }
 }
 
@@ -455,10 +476,38 @@ void QOhosInputMethodEventHandler::onKeyEvent(const QOhosKeyEvent &keyEvent, QWi
     }
     const auto count = m_autoRepeatCountMap.value(qOhosQtKeyEvent.keyCode, 1);
 
+    // The hardware key callback is registered by the main window's
+    // XComponent, so targetWindow is always the main window. Subwindows are
+    // shown without taking ArkUI focus (see QOhosView::showWindow), so the
+    // keys keep arriving on the main window's callback; re-target them to
+    // the Qt window that should logically receive them: the active modal
+    // window, else the topmost visible dialog, else the focused window.
+    QWindow *keyTargetWindow = targetWindow;
+    if (QWindow *modalWindow = QGuiApplication::modalWindow()) {
+        keyTargetWindow = modalWindow;
+    } else {
+        QWindow *topmostDialog = nullptr;
+        for (QWindow *candidate : QGuiApplication::allWindows()) {
+            if (!candidate->isVisible())
+                continue;
+            // NOTE: Qt::Dialog == 0x2 | Qt::Window, so a bitmask test would
+            // match every plain window; compare the masked type instead.
+            const Qt::WindowType candidateType =
+                static_cast<Qt::WindowType>(int(candidate->type()) & Qt::WindowType_Mask);
+            if (candidateType != Qt::Dialog && candidateType != Qt::Sheet)
+                continue;
+            topmostDialog = candidate;
+        }
+        if (topmostDialog != nullptr)
+            keyTargetWindow = topmostDialog;
+        else if (QWindow *focusWindow = QGuiApplication::focusWindow())
+            keyTargetWindow = focusWindow;
+    }
+
     QWindowSystemInterface::handleExtendedKeyEvent(
         !m_currentKeyboardGrabbingWindow.isNull()
             ? m_currentKeyboardGrabbingWindow.data()
-            : targetWindow,
+            : keyTargetWindow,
         qOhosQtKeyEvent.keyAction, qOhosQtKeyEvent.keyCode,
         qOhosQtKeyEvent.guiApplicationKeyboardModifiers, nativeScanCode,
         qOhosQtKeyEvent.nativeKeyCode, nativeModifiers, qOhosQtKeyEvent.keyText, count > 1, count);

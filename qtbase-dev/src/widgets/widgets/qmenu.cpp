@@ -2611,24 +2611,6 @@ void QMenuPrivate::popup(const QPoint &p, QAction *atAction, PositionFunction po
             QGuiApplicationPrivate::activatePopup(menuWindow);
     }
 
-    // ohshark diag: dump menu identity, origin and item rects so on-device tap
-    // coordinates can be derived exactly from qt_debug.log
-    if (FILE *df = fopen("/data/storage/el2/base/files/qt_debug.log", "a")) {
-        const QPoint originL = q->mapToGlobal(QPoint(0, 0));
-        fprintf(df, "[menu.popup] action='%s' origin=%d,%d size=%dx%d caused='%s'\n",
-                q->menuAction() ? q->menuAction()->text().toUtf8().constData() : "?",
-                originL.x(), originL.y(), q->width(), q->height(),
-                causedPopup.action ? causedPopup.action->text().toUtf8().constData() : "");
-        const QList<QAction *> acts = q->actions();
-        for (int i = 0; i < acts.size(); ++i) {
-            QAction *a = acts.at(i);
-            const QRect r = q->actionGeometry(a);
-            fprintf(df, "[menu.item] %d '%s' rect=%d,%d %dx%d\n", i,
-                    a->text().toUtf8().constData(), r.x(), r.y(), r.width(), r.height());
-        }
-        fclose(df);
-    }
-
 #if QT_CONFIG(accessibility)
     QAccessibleEvent event(q, QAccessible::PopupMenuStart);
     QAccessible::updateAccessibility(&event);
