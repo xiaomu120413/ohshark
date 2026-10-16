@@ -157,6 +157,12 @@ private:
     std::optional<QOhosMouseEvent> m_lastWsiMouseEvent;
     std::optional<QWindowSystemInterfaceTouchEvent> m_lastWsiTouchEvent;
     std::optional<std::int32_t> m_optNonClientAreaTouchPointerId;
+
+    // Long-press-to-context-menu synthesis for touch screens (see
+    // onTouchEventFromXComponent).
+    qint64 m_touchPressTimestampMs = -1;
+    QPointF m_touchPressDisplayPosition;
+    bool m_touchHoldCancelled = false;
 };
 
 QT_END_NAMESPACE

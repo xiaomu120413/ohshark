@@ -348,6 +348,23 @@ void QOhosInputMethodEventHandler::onTouchEventFromXComponent(
             if (state != QEventPoint::State::Released)
                 activeTouchPointDisplayPositions.push_back(touchPointData.displayPosition.toPoint());
 
+            // Track the hold for long-press-to-context-menu: remember where
+            // and when a single finger landed; a drag (or a second finger)
+            // cancels the hold.
+            if (state == QEventPoint::State::Pressed) {
+                if (wsiTouchPoints.isEmpty()) {
+                    m_touchPressTimestampMs = timeStampMs.count();
+                    m_touchPressDisplayPosition = touchPointData.displayPosition;
+                    m_touchHoldCancelled = false;
+                } else {
+                    m_touchHoldCancelled = true;
+                }
+            } else if (state == QEventPoint::State::Updated
+                       && !m_touchHoldCancelled
+                       && (touchPointData.displayPosition - m_touchPressDisplayPosition).manhattanLength() > 25) {
+                m_touchHoldCancelled = true;
+            }
+
             QWindowSystemInterface::TouchPoint qwsiTouchPoint;
             qwsiTouchPoint.id = touchPoint.id;
             qwsiTouchPoint.pressure = touchPoint.force;
@@ -432,8 +449,47 @@ void QOhosInputMethodEventHandler::onTouchEventFromXComponent(
                 [](const QWindowSystemInterface::TouchPoint &point) {
                     return point.state == QEventPoint::State::Released;
                 });
-            if (allReleased)
+            if (allReleased) {
+                // A touch screen has no right button; desktop-style context
+                // menus would be unreachable. Holding a finger still for a
+                // moment is the platform convention, so synthesize a right
+                // click at the press position after a long press. A right
+                // click goes through the regular mouse pipeline (widget
+                // picking, qt_last_mouse_receiver, context-menu synthesis on
+                // release), unlike a raw context-menu event which is routed
+                // to the last mouse receiver and dropped when touch never
+                // produced one.
+                constexpr qint64 touchContextMenuHoldMs = 800;
+                if (!m_touchHoldCancelled
+                    && m_touchPressTimestampMs >= 0
+                    && timeStampMs.count() - m_touchPressTimestampMs >= touchContextMenuHoldMs) {
+                    const QPointF nativeGlobal = m_touchPressDisplayPosition;
+                    auto *platformWindow = QOhosPlatformWindow::fromQWindowOrNull(targetWindow);
+                    const QPointF nativeLocal = nativeGlobal
+                        - QPointF(platformWindow != nullptr
+                                      ? platformWindow->geometry().topLeft()
+                                      : QPoint());
+                    QWindowSystemInterface::handleMouseEvent(
+                        targetWindow, nativeLocal, nativeGlobal,
+                        Qt::RightButton, Qt::RightButton, QEvent::MouseButtonPress,
+                        Qt::NoModifier, Qt::MouseEventNotSynthesized);
+                    QWindowSystemInterface::handleMouseEvent(
+                        targetWindow, nativeLocal, nativeGlobal,
+                        Qt::NoButton, Qt::RightButton, QEvent::MouseButtonRelease,
+                        Qt::NoModifier, Qt::MouseEventNotSynthesized);
+                }
+                m_touchPressTimestampMs = -1;
+                m_touchHoldCancelled = true;
+
+                // A touch screen has no persistent pointer: once the last
+                // contact ends no further mouse moves arrive, but Qt
+                // synthesized mouse moves (and thus hover) from the touch.
+                // Without a leave event the hover sticks to the last touched
+                // widget forever — e.g. the packet list keeps the touched row
+                // highlighted while the selection moves away with the
+                // keyboard. Clear it like a mouse cursor leaving.
                 QWindowSystemInterface::handleLeaveEvent(targetWindow);
+            }
         }
     }
 }
